@@ -4181,7 +4181,7 @@ _pidgin_e2ee_stock_icon_get(const gchar *stock_name)
 	g_snprintf(filename, sizeof(filename), "%s.png", stock_name);
 	path = g_build_filename(PURPLE_DATADIR, "pixmaps", "pidgin",
 		"e2ee", "16", filename, NULL);
-	image = purple_image_new_from_file(path, FALSE);
+	image = purple_image_new_from_file(path, NULL);
 	g_free(path);
 
 	g_hash_table_insert(e2ee_stock, g_strdup(stock_name), image);
@@ -6536,14 +6536,12 @@ static gboolean
 pidgin_conv_write_smiley(GString *out, PurpleSmiley *smiley,
 	PurpleConversation *conv, gpointer _proto_name)
 {
-	PurpleImage *image;
 	gchar *escaped_shortcut;
 	gchar *uri;
 
 	escaped_shortcut = g_markup_escape_text(
 		purple_smiley_get_shortcut(smiley), -1);
-	image = purple_smiley_get_image(smiley);
-	uri = purple_image_store_get_uri(image);
+	uri = purple_image_store_get_uri(PURPLE_IMAGE(smiley));
 
 	g_string_append_printf(out,
 		"<img class=\"emoticon\" alt=\"%s\" title=\"%s\" "
@@ -6592,11 +6590,14 @@ box_remote_image_cb(const GMatchInfo *info, GString *result, gpointer _conv)
 
 	full = g_match_info_fetch(info, 0);
 
+#warning fix this
+#if 0
 	if (purple_image_is_ready(image)) {
 		g_string_append(result, full);
 		g_free(full);
 		return FALSE;
 	}
+#endif
 
 	/* search for alt */
 	alt = strstr(full, "alt=\"");
@@ -7859,7 +7860,7 @@ pidgin_conv_update_buddy_icon(PurpleIMConversation *im)
 			if (custom_img) {
 				/* There is a custom icon for this user */
 				data = purple_image_get_data(custom_img);
-				len = purple_image_get_size(custom_img);
+				len = purple_image_get_data_size(custom_img);
 			}
 		}
 	}
