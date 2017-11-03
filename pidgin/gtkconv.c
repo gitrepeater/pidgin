@@ -61,6 +61,7 @@
 #include "gtkpounce.h"
 #include "gtkprefs.h"
 #include "gtkprivacy.h"
+#include "gtkstyle.h"
 #include "gtkutils.h"
 #include "gtkwebview.h"
 #include "pidginstock.h"
@@ -8940,6 +8941,57 @@ pidgin_conversations_pre_uninit(void)
 	e2ee_stock = NULL;
 }
 
+/* Invalidate the first tab color set */
+static gboolean tab_color_fuse = TRUE;
+
+static void
+pidgin_conversations_set_tab_colors(void)
+{
+	/* Set default tab colors */
+	GString *str = g_string_new(NULL);
+	GtkSettings *settings = gtk_settings_get_default();
+	GtkStyle *parent = gtk_rc_get_style_by_paths(settings, "tab-container.tab-label*", NULL, G_TYPE_NONE), *now;
+	struct {
+		const char *stylename;
+		const char *labelname;
+		const char *color;
+	} styles[] = {
+		{"pidgin_tab_label_typing_default", "tab-label-typing", "#4e9a06"},
+		{"pidgin_tab_label_typed_default", "tab-label-typed", "#c4a000"},
+		{"pidgin_tab_label_attention_default", "tab-label-attention", "#006aff"},
+		{"pidgin_tab_label_unreadchat_default", "tab-label-unreadchat", "#cc0000"},
+		{"pidgin_tab_label_event_default", "tab-label-event", "#888a85"},
+		{NULL, NULL, NULL}
+	};
+	int iter;
+
+	if(tab_color_fuse) {
+		tab_color_fuse = FALSE;
+		return;
+	}
+
+	for (iter = 0; styles[iter].stylename; iter++) {
+		now = gtk_rc_get_style_by_paths(settings, styles[iter].labelname, NULL, G_TYPE_NONE);
+		if (parent == now ||
+				(parent && now && parent->rc_style == now->rc_style)) {
+			GdkColor color;
+			gdk_color_parse(styles[iter].color, &color);
+			pidgin_style_adjust_contrast(gtk_widget_get_default_style(), &color);
+
+			g_string_append_printf(str, "style \"%s\" {\n"
+					"fg[ACTIVE] = \"%s\"\n"
+					"}\n"
+					"widget \"*%s\" style \"%s\"\n",
+					styles[iter].stylename,
+					gdk_color_to_string(&color),
+					styles[iter].labelname, styles[iter].stylename);
+		}
+	}
+	gtk_rc_parse_string(str->str);
+	g_string_free(str, TRUE);
+	gtk_rc_reset_styles(settings);
+}
+
 void
 pidgin_conversations_uninit(void)
 {
@@ -10247,6 +10299,9 @@ pidgin_conv_window_new()
 	purple_signal_emit(pidgin_conversations_get_handle(),
 		"conversation-window-created", win);
 
+	/* Fix colours */
+	pidgin_conversations_set_tab_colors();
+
 	return win;
 }
 
@@ -11209,6 +11264,9 @@ generate_nick_colors(guint numcolors, GdkRGBA background)
 
 	gdk_rgba_parse(&nick_highlight, DEFAULT_HIGHLIGHT_COLOR);
 	gdk_rgba_parse(&send_color, DEFAULT_SEND_COLOR);
+
+	pidgin_style_adjust_contrast(NULL, &nick_highlight);
+	pidgin_style_adjust_contrast(NULL, &send_color);
 
 	srand(background.red * 65535 + background.green * 65535 + background.blue * 65535 + 1);
 

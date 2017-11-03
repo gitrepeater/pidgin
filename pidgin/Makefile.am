@@ -79,6 +79,7 @@ libpidgin_la_SOURCES = \
 	gtksound.c \
 	gtkstatus-icon-theme.c \
 	gtkstatusbox.c \
+	gtkstyle.c \
 	gtkutils.c \
 	gtkwebview.c \
 	gtkwebviewtoolbar.c \
@@ -128,6 +129,7 @@ libpidgin_la_headers = \
 	gtksound.h \
 	gtkstatus-icon-theme.h \
 	gtkstatusbox.h \
+	gtkstyle.h \
 	pidginstock.h \
 	gtkutils.h \
 	gtkwebview.h \
