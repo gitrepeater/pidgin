@@ -33,6 +33,7 @@
 #include <glib.h>
 #include "debug.h"
 #include "libc_internal.h"
+#include "util.h"
 #include <glib/gstdio.h>
 #include "util.h"
 

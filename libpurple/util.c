@@ -1472,7 +1472,7 @@ purple_markup_unescape_entity(const char *text, int *length)
 		pln = "\302\256";      /* or use g_unichar_to_utf8(0xae); */
 	else if(IS_ENTITY("&apos;"))
 		pln = "\'";
-	else if(text[1] == '#' && g_ascii_isxdigit(text[2])) {
+	else if(text[1] == '#' && (g_ascii_isxdigit(text[2]) || text[2] == 'x')) {
 		static char buf[7];
 		const char *start = text + 2;
 		char *end;
@@ -4269,6 +4269,17 @@ purple_uri_list_extract_filenames(const gchar *uri_list)
 		g_free (s);
 	}
 	return result;
+}
+
+char *
+purple_uri_escape_for_open(const char *unescaped)
+{
+	/* Replace some special characters like $ with their percent-encoded value.
+	 * This shouldn't be necessary because we shell-escape the entire arg before
+	 * exec'ing the browser, however, we had a report that a URL containing
+	 * $(xterm) was causing xterm to start on his system. This is obviously a
+	 * bug on his system, but it's pretty easy for us to protect against it. */
+	return g_uri_escape_string(unescaped, "[]:;/%#,+?=&@", FALSE);
 }
 
 /**************************************************************************
