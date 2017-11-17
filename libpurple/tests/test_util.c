@@ -523,6 +523,30 @@ test_util_strdup_withhtml(void) {
 }
 
 /******************************************************************************
+ * URI Escaping
+ *****************************************************************************/
+static void
+test_uri_escape_for_open(void) {
+	/* make sure shell stuff is escaped... */
+	gchar *result = purple_uri_escape_for_open("https://$(xterm)");
+	g_assert_cmpstr("https://%24%28xterm%29", ==, result);
+	g_free(result);
+
+	result = purple_uri_escape_for_open("https://`xterm`");
+	g_assert_cmpstr("https://%60xterm%60", ==, result);
+	g_free(result);
+
+	result = purple_uri_escape_for_open("https://$((25 + 13))");
+	g_assert_cmpstr("https://%24%28%2825%20+%2013%29%29", ==, result);
+	g_free(result);
+
+	/* ...but keep brackets so that ipv6 links can be opened. */
+	result = purple_uri_escape_for_open("https://[123:4567:89a::::]");
+	g_assert_cmpstr("https://[123:4567:89a::::]", ==, result);
+	g_free(result);
+}
+
+/******************************************************************************
  * MANE
  *****************************************************************************/
 gint
@@ -569,6 +593,9 @@ main(gint argc, gchar **argv) {
 
 	g_test_add_func("/util/test_strdup_withhtml",
 	                test_util_strdup_withhtml);
+
+	g_test_add_func("/util/test_uri_escape_for_open",
+	                test_uri_escape_for_open);
 
 	return g_test_run();
 }

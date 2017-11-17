@@ -1,3 +1,8 @@
+/**
+ * @file gtkstyle.h GTK+ Style utility functions
+ * @ingroup pidgin
+ */
+
 /* pidgin
  *
  * Pidgin is the legal property of its developers, whose names are too numerous
@@ -17,34 +22,38 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02111-1301  USA
- *
  */
+#ifndef _PIDGINSTYLE_H_
+#define _PIDGINSTYLE_H_
 
-#ifndef _PIDGINPLUGINPREF_H_
-#define _PIDGINPLUGINPREF_H_
-/**
- * SECTION:gtkpluginpref
- * @section_id: pidgin-gtkpluginpref
- * @short_description: <filename>gtkpluginpref.h</filename>
- * @title: Plugin Preferences
- */
-
-#include "pluginpref.h"
-
-#include "pidgin.h"
+#include <gtk/gtk.h>
 
 G_BEGIN_DECLS
 
+/*@{*/
+
 /**
- * pidgin_plugin_pref_create_frame:
- * @frame: PurplePluginPrefFrame
+ * Returns TRUE if dark mode is enabled and foreground colours should be invertred
  *
- * Creates a Gtk Preference frame for a PurplePluginPrefFrame
+ * @param style The GtkStyle in use, or NULL to use a cached version.
  *
- * Returns: (transfer full): The gtk preference frame
+ * @return @c TRUE if dark mode, @c FALSE otherwise
  */
-GtkWidget *pidgin_plugin_pref_create_frame(PurplePluginPrefFrame *frame);
+
+gboolean pidgin_style_is_dark(GtkStyle *style);
+
+/**
+ * Lighten a color if dark mode is enabled.
+ *
+ * @param style The GtkStyle in use.
+ *
+ * @param color Color to be lightened. Transformed color will be written here.
+ */
+
+void pidgin_style_adjust_contrast(GtkStyle *style, GdkColor *color);
+
+/*@}*/
 
 G_END_DECLS
 
-#endif /* _PIDGINPLUGINPREF_H_ */
+#endif /* _PIDGINSTYLE_H_ */
