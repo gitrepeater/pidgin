@@ -96,7 +96,7 @@ GType purple_blist_node_get_type(void);
  * See purple_blist_node_get_parent(), purple_blist_node_get_first_child(),
  *   purple_blist_node_get_sibling_next(), purple_blist_node_get_sibling_prev().
  *
- * Returns:	The next node
+ * Returns: (transfer none): The next node
  */
 PurpleBlistNode *purple_blist_node_next(PurpleBlistNode *node, gboolean offline);
 
@@ -109,7 +109,7 @@ PurpleBlistNode *purple_blist_node_next(PurpleBlistNode *node, gboolean offline)
  * See purple_blist_node_get_first_child(), purple_blist_node_get_sibling_next(),
  *     purple_blist_node_get_sibling_prev(), purple_blist_node_next().
  *
- * Returns:  The parent node.
+ * Returns: (transfer none): The parent node.
  */
 PurpleBlistNode *purple_blist_node_get_parent(PurpleBlistNode *node);
 
@@ -289,10 +289,8 @@ gboolean purple_blist_node_is_transient(PurpleBlistNode *node);
  * purple_blist_node_get_extended_menu:
  * @n: The blist node for which to obtain the extended menu items.
  *
- * Retrieves the extended menu items for a buddy list node.
- *
- * Returns:  A list of PurpleMenuAction items, as harvested by the
- *          blist-node-extended-menu signal.
+ * Returns: (element-type PurpleMenuAction): The extended menu items for a buddy
+ *          list node, as harvested by the blist-node-extended-menu signal.
  */
 GList *purple_blist_node_get_extended_menu(PurpleBlistNode *n);
 

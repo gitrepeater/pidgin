@@ -61,6 +61,7 @@
 #include "gtkpounce.h"
 #include "gtkprefs.h"
 #include "gtkprivacy.h"
+#include "gtkstyle.h"
 #include "gtkutils.h"
 #include "gtkwebview.h"
 #include "pidginstock.h"
@@ -1798,9 +1799,7 @@ gtkconv_chat_popup_menu_cb(GtkWidget *widget, PidginConversation *gtkconv)
 
 	gtk_tree_model_get(GTK_TREE_MODEL(model), &iter, CHAT_USERS_NAME_COLUMN, &who, -1);
 	menu = create_chat_menu (PURPLE_CHAT_CONVERSATION(conv), who, gc);
-	gtk_menu_popup(GTK_MENU(menu), NULL, NULL,
-				   pidgin_treeview_popup_menu_position_func, widget,
-				   0, GDK_CURRENT_TIME);
+	pidgin_menu_popup_at_treeview_selection(menu, widget);
 	g_free(who);
 
 	return TRUE;
@@ -1852,19 +1851,18 @@ right_click_chat_cb(GtkWidget *widget, GdkEventButton *event,
 			goto handled;
 	}
 
-	if (event->button == 1 && event->type == GDK_2BUTTON_PRESS) {
+	if (event->button == GDK_BUTTON_PRIMARY && event->type == GDK_2BUTTON_PRESS) {
 		chat_do_im(gtkconv, who);
-	} else if (event->button == 2 && event->type == GDK_BUTTON_PRESS) {
+	} else if (event->button == GDK_BUTTON_MIDDLE && event->type == GDK_BUTTON_PRESS) {
 		/* Move to user's anchor */
 		WebKitDOMNode *node = get_mark_for_user(gtkconv, who);
 
 		if (node != NULL)
 			webkit_dom_element_scroll_into_view(WEBKIT_DOM_ELEMENT(node), TRUE);
 
-	} else if (event->button == 3 && event->type == GDK_BUTTON_PRESS) {
+	} else if (gdk_event_triggers_context_menu((GdkEvent *)event)) {
 		GtkWidget *menu = create_chat_menu (PURPLE_CHAT_CONVERSATION(conv), who, gc);
-		gtk_menu_popup(GTK_MENU(menu), NULL, NULL, NULL, NULL,
-					   event->button, event->time);
+		gtk_menu_popup_at_pointer(GTK_MENU(menu), (GdkEvent *)event);
 	}
 
 handled:
@@ -2291,7 +2289,7 @@ entry_key_press_cb(GtkWidget *entry, GdkEventKey *event, gpointer data)
 static gboolean
 entry_stop_rclick_cb(GtkWidget *widget, GdkEventButton *event, gpointer data)
 {
-	if (event->button == 3 && event->type == GDK_BUTTON_PRESS) {
+	if (event->button == GDK_BUTTON_SECONDARY && event->type == GDK_BUTTON_PRESS) {
 		/* Right single click */
 		g_signal_stop_emission_by_name(G_OBJECT(widget), "button_press_event");
 
@@ -2964,12 +2962,12 @@ icon_menu(GtkWidget *widget, GdkEventButton *e, PidginConversation *gtkconv)
 	PurpleConversation *conv;
 	PurpleBuddy *buddy;
 
-	if (e->button == 1 && e->type == GDK_BUTTON_PRESS) {
+	if (e->button == GDK_BUTTON_PRIMARY && e->type == GDK_BUTTON_PRESS) {
 		change_size_cb(NULL, gtkconv);
 		return TRUE;
 	}
 
-	if (e->button != 3 || e->type != GDK_BUTTON_PRESS) {
+	if (!gdk_event_triggers_context_menu((GdkEvent *)e)) {
 		return FALSE;
 	}
 
@@ -3017,7 +3015,7 @@ icon_menu(GtkWidget *widget, GdkEventButton *e, PidginConversation *gtkconv)
 		}
 	}
 
-	gtk_menu_popup(GTK_MENU(menu), NULL, NULL, NULL, NULL, e->button, e->time);
+	gtk_menu_popup_at_pointer(GTK_MENU(menu), (GdkEvent *)e);
 
 	return TRUE;
 }
@@ -5885,7 +5883,7 @@ ignore_middle_click(GtkWidget *widget, GdkEventButton *e, gpointer null)
 	 * So if Stu accidentally aims high and middle clicks on the pane-handle,
 	 * it causes a conversation tab to close. Let's stop that from happening.
 	 */
-	if (e->button == 2 && e->type == GDK_BUTTON_PRESS)
+	if (e->button == GDK_BUTTON_MIDDLE && e->type == GDK_BUTTON_PRESS)
 		return TRUE;
 	return FALSE;
 }
@@ -6248,17 +6246,17 @@ static gboolean buddytag_event(GtkTextTag *tag, GObject *imhtml,
 			}
 		}
 
-		if (btn_event->button == 1 && event->type == GDK_2BUTTON_PRESS) {
+		if (btn_event->button == GDK_BUTTON_PRIMARY && event->type == GDK_2BUTTON_PRESS) {
 			chat_do_im(PIDGIN_CONVERSATION(conv), buddyname);
 			g_free(name);
 
 			return TRUE;
-		} else if (btn_event->button == 2 && event->type == GDK_2BUTTON_PRESS) {
+		} else if (btn_event->button == GDK_BUTTON_MIDDLE && event->type == GDK_2BUTTON_PRESS) {
 			chat_do_info(PIDGIN_CONVERSATION(conv), buddyname);
 			g_free(name);
 
 			return TRUE;
-		} else if (btn_event->button == 3 && event->type == GDK_BUTTON_PRESS) {
+		} else if (gdk_event_triggers_context_menu(event)) {
 			GtkTextIter start, end;
 
 			/* we shouldn't display the popup
@@ -6270,12 +6268,8 @@ static gboolean buddytag_event(GtkTextTag *tag, GObject *imhtml,
 				PurpleConnection *gc =
 					purple_conversation_get_connection(conv);
 
-
 				menu = create_chat_menu(conv, buddyname, gc);
-				gtk_menu_popup(GTK_MENU(menu), NULL, NULL,
-						NULL, GTK_WIDGET(imhtml),
-						btn_event->button,
-						btn_event->time);
+				gtk_menu_popup_at_pointer(GTK_MENU(menu), event);
 
 				g_free(name);
 
@@ -8955,6 +8949,57 @@ pidgin_conversations_pre_uninit(void)
 	e2ee_stock = NULL;
 }
 
+/* Invalidate the first tab color set */
+static gboolean tab_color_fuse = TRUE;
+
+static void
+pidgin_conversations_set_tab_colors(void)
+{
+	/* Set default tab colors */
+	GString *str = g_string_new(NULL);
+	GtkSettings *settings = gtk_settings_get_default();
+	GtkStyle *parent = gtk_rc_get_style_by_paths(settings, "tab-container.tab-label*", NULL, G_TYPE_NONE), *now;
+	struct {
+		const char *stylename;
+		const char *labelname;
+		const char *color;
+	} styles[] = {
+		{"pidgin_tab_label_typing_default", "tab-label-typing", "#4e9a06"},
+		{"pidgin_tab_label_typed_default", "tab-label-typed", "#c4a000"},
+		{"pidgin_tab_label_attention_default", "tab-label-attention", "#006aff"},
+		{"pidgin_tab_label_unreadchat_default", "tab-label-unreadchat", "#cc0000"},
+		{"pidgin_tab_label_event_default", "tab-label-event", "#888a85"},
+		{NULL, NULL, NULL}
+	};
+	int iter;
+
+	if(tab_color_fuse) {
+		tab_color_fuse = FALSE;
+		return;
+	}
+
+	for (iter = 0; styles[iter].stylename; iter++) {
+		now = gtk_rc_get_style_by_paths(settings, styles[iter].labelname, NULL, G_TYPE_NONE);
+		if (parent == now ||
+				(parent && now && parent->rc_style == now->rc_style)) {
+			GdkColor color;
+			gdk_color_parse(styles[iter].color, &color);
+			pidgin_style_adjust_contrast(gtk_widget_get_default_style(), &color);
+
+			g_string_append_printf(str, "style \"%s\" {\n"
+					"fg[ACTIVE] = \"%s\"\n"
+					"}\n"
+					"widget \"*%s\" style \"%s\"\n",
+					styles[iter].stylename,
+					gdk_color_to_string(&color),
+					styles[iter].labelname, styles[iter].stylename);
+		}
+	}
+	gtk_rc_parse_string(str->str);
+	g_string_free(str, TRUE);
+	gtk_rc_reset_styles(settings);
+}
+
 void
 pidgin_conversations_uninit(void)
 {
@@ -9365,7 +9410,7 @@ notebook_leave_cb(GtkWidget *widget, GdkEventCrossing *e, PidginConvWindow *win)
 static gboolean
 infopane_press_cb(GtkWidget *widget, GdkEventButton *e, PidginConversation *gtkconv)
 {
-	if (e->type == GDK_2BUTTON_PRESS && e->button == 1) {
+	if (e->type == GDK_2BUTTON_PRESS && e->button == GDK_BUTTON_PRIMARY) {
 		if (infopane_entry_activate(gtkconv))
 			return TRUE;
 	}
@@ -9373,7 +9418,7 @@ infopane_press_cb(GtkWidget *widget, GdkEventButton *e, PidginConversation *gtkc
 	if (e->type != GDK_BUTTON_PRESS)
 		return FALSE;
 
-	if (e->button == 1) {
+	if (e->button == GDK_BUTTON_PRIMARY) {
 		int nb_x, nb_y;
 		GtkAllocation allocation;
 
@@ -9399,7 +9444,7 @@ infopane_press_cb(GtkWidget *widget, GdkEventButton *e, PidginConversation *gtkc
 		return FALSE;
 	}
 
-	if (e->button == 3) {
+	if (gdk_event_triggers_context_menu((GdkEvent *)e)) {
 		/* Right click was pressed. Popup the context menu. */
 		GtkWidget *menu = gtk_menu_new(), *sub;
 		gboolean populated = populate_menu_with_options(menu, gtkconv, TRUE);
@@ -9419,7 +9464,7 @@ infopane_press_cb(GtkWidget *widget, GdkEventButton *e, PidginConversation *gtkc
 		}
 
 		gtk_widget_show_all(menu);
-		gtk_menu_popup(GTK_MENU(menu), NULL, NULL, NULL, NULL, e->button, e->time);
+		gtk_menu_popup_at_pointer(GTK_MENU(menu), (GdkEvent *)e);
 		return TRUE;
 	}
 	return FALSE;
@@ -9434,7 +9479,7 @@ notebook_press_cb(GtkWidget *widget, GdkEventButton *e, PidginConvWindow *win)
 	GtkWidget *tab;
 	GtkAllocation allocation;
 
-	if (e->button == 2 && e->type == GDK_BUTTON_PRESS) {
+	if (e->button == GDK_BUTTON_MIDDLE && e->type == GDK_BUTTON_PRESS) {
 		PidginConversation *gtkconv;
 		tab_clicked = pidgin_conv_get_tab_at_xy(win, e->x_root, e->y_root, NULL);
 
@@ -9447,7 +9492,7 @@ notebook_press_cb(GtkWidget *widget, GdkEventButton *e, PidginConvWindow *win)
 	}
 
 
-	if (e->button != 1 || e->type != GDK_BUTTON_PRESS)
+	if (e->button != GDK_BUTTON_PRIMARY || e->type != GDK_BUTTON_PRESS)
 		return FALSE;
 
 
@@ -9530,7 +9575,7 @@ notebook_release_cb(GtkWidget *widget, GdkEventButton *e, PidginConvWindow *win)
 	* widget's, because we may be getting an event passed on from the
 	* close button.
 	*/
-	if (e->button != 1 && e->type != GDK_BUTTON_RELEASE)
+	if (e->button != GDK_BUTTON_PRIMARY && e->type != GDK_BUTTON_RELEASE)
 		return FALSE;
 
 	device = gdk_event_get_device((GdkEvent *)e);
@@ -9812,7 +9857,7 @@ notebook_right_click_menu_cb(GtkNotebook *notebook, GdkEventButton *event,
 	GtkWidget *menu;
 	PidginConversation *gtkconv;
 
-	if (event->type != GDK_BUTTON_PRESS || event->button != 3)
+	if (!gdk_event_triggers_context_menu((GdkEvent *)event))
 		return FALSE;
 
 	gtkconv = pidgin_conv_window_get_gtkconv_at_index(win,
@@ -9822,7 +9867,7 @@ notebook_right_click_menu_cb(GtkNotebook *notebook, GdkEventButton *event,
 
 	menu = win->notebook_menu;
 
-	gtk_menu_popup(GTK_MENU(menu), NULL, NULL, NULL, NULL, 3, event->time);
+	gtk_menu_popup_at_pointer(GTK_MENU(menu), (GdkEvent *)event);
 
 	return TRUE;
 }
@@ -10261,6 +10306,9 @@ pidgin_conv_window_new()
 
 	purple_signal_emit(pidgin_conversations_get_handle(),
 		"conversation-window-created", win);
+
+	/* Fix colours */
+	pidgin_conversations_set_tab_colors();
 
 	return win;
 }
@@ -11224,6 +11272,9 @@ generate_nick_colors(guint numcolors, GdkRGBA background)
 
 	gdk_rgba_parse(&nick_highlight, DEFAULT_HIGHLIGHT_COLOR);
 	gdk_rgba_parse(&send_color, DEFAULT_SEND_COLOR);
+
+	pidgin_style_adjust_contrast(NULL, &nick_highlight);
+	pidgin_style_adjust_contrast(NULL, &send_color);
 
 	srand(background.red * 65535 + background.green * 65535 + background.blue * 65535 + 1);
 

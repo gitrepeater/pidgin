@@ -35,6 +35,7 @@ libpidgin_SOURCES = [
 	'gtksound.c',
 	'gtkstatus-icon-theme.c',
 	'gtkstatusbox.c',
+	'gtkstyle.c',
 	'gtkutils.c',
 	'gtkwebview.c',
 	'gtkwebviewtoolbar.c',
@@ -42,7 +43,8 @@ libpidgin_SOURCES = [
 	'gtkxfer.c',
 	'libpidgin.c',
 	'minidialog.c',
-	'pidgintooltip.c'
+	'pidginabout.c',
+	'pidgintooltip.c',
 ]
 
 libpidgin_headers = [
@@ -83,6 +85,7 @@ libpidgin_headers = [
 	'gtksound.h',
 	'gtkstatus-icon-theme.h',
 	'gtkstatusbox.h',
+	'gtkstyle.h',
 	'pidginstock.h',
 	'gtkutils.h',
 	'gtkwebview.h',
@@ -90,15 +93,16 @@ libpidgin_headers = [
 	'gtkwhiteboard.h',
 	'gtkxfer.h',
 	'minidialog.h',
+	'pidginabout.h',
 	'pidgintooltip.h',
-	'pidgin.h'
+	'pidgin.h',
 ]
 
 pidgin_SOURCES = [
 	'pidgin.c'
 ]
 
-pidgin_resource = gnome.compile_resources('pidgin.gresource', 'pidgin.gresource.xml',
+pidgin_resource = gnome.compile_resources('pidginresources', 'pidgin.gresource.xml',
   c_name : 'pidgin')
 libpidgin_SOURCES += pidgin_resource
 
@@ -149,7 +153,20 @@ if ENABLE_GTK
 	    libpidgin_SOURCES,
 	    include_directories : [toplevel_inc],
 	    version : PURPLE_LIB_VERSION,
-	    dependencies : [gtk, gstreamer_video, webkit, enchant, dbus, x11, GCR, IOKIT, libpurple_dep, glib, math],
+	    dependencies : [
+	    	dbus,
+	    	enchant,
+	    	GCR,
+	    	glib,
+	    	gstreamer_video,
+	    	gtk,
+	    	IOKIT,
+	    	json,
+	    	math,
+	    	webkit,
+	    	x11,
+	    	libpurple_dep,
+	    ],
 	    install : true)
 	libpidgin_dep = declare_dependency(
 	    include_directories : [toplevel_inc, libpidgin_inc],
@@ -168,11 +185,15 @@ if ENABLE_GTK
 #		pidgin_LDFLAGS += -mwindows
 	endif
 
-	configure_file(input : 'data/pidgin-3.pc.in',
-	               output : 'pidgin-3.pc',
-	               configuration : pkg_conf,
-	               install : true,
-	               install_dir : get_option('libdir') + '/pkgconfig')
+	pkgconfig.generate(
+	    name : 'Pidgin',
+	    description : 'Pidgin is a GTK3-based instant messenger application.',
+	    version : purple_display_version,
+	    filebase : 'pidgin-3',
+	    subdirs : 'pidgin',
+	    libraries : [libpidgin],
+	    requires : ['gtk+-3.0', 'webkitgtk-3.0', 'purple-3'],
+	    variables : ['plugindir=${libdir}/pidgin'])
 
 	if INSTALL_I18N
 		DESKTOP_FILE = 'im.pidgin.Pidgin.desktop'
@@ -204,7 +225,7 @@ if ENABLE_GTK
 
 		gnome.generate_gir(libpidgin,
 		    sources : introspection_sources,
-		    includes : ['GObject-2.0', 'Gtk-3.0', libpurple_gir[0]],
+		    includes : ['GObject-2.0', 'Gtk-3.0', libpurple_gir[0], 'WebKit-3.0'],
 		    namespace : 'Pidgin',
 		    symbol_prefix : 'pidgin',
 		    identifier_prefix : 'Pidgin',
