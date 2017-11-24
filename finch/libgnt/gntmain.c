@@ -551,10 +551,11 @@ raise:
 
 #ifdef SIGWINCH
 static void (*org_winch_handler)(int);
+static void (*org_winch_handler_sa)(int, siginfo_t *, void *);
 #endif
 
 static void
-sighandler(int sig)
+sighandler(int sig, siginfo_t *info, void *data)
 {
 	switch (sig) {
 #ifdef SIGWINCH
@@ -563,18 +564,17 @@ sighandler(int sig)
 		g_idle_add((GSourceFunc)refresh_screen, NULL);
 		if (org_winch_handler)
 			org_winch_handler(sig);
-		signal(SIGWINCH, sighandler);
+		if (org_winch_handler_sa)
+			org_winch_handler_sa(sig, info, data);
 		break;
 #endif
 #ifndef _WIN32
 	case SIGCHLD:
 		clean_pid();
-		signal(SIGCHLD, sighandler);
 		break;
 #endif
 	case SIGINT:
 		ask_before_exit();
-		signal(SIGINT, sighandler);
 		break;
 	}
 }
@@ -602,6 +602,10 @@ void gnt_init()
 {
 	char *filename;
 	const char *locale;
+	struct sigaction act;
+#ifdef SIGWINCH
+	struct sigaction oact;
+#endif
 
 	if (channel)
 		return;
@@ -654,14 +658,26 @@ void gnt_init()
 	werase(stdscr);
 	wrefresh(stdscr);
 
+	act.sa_sigaction = sighandler;
+	sigemptyset(&act.sa_mask);
+	act.sa_flags = SA_SIGINFO;
+
 #ifdef SIGWINCH
-	org_winch_handler = signal(SIGWINCH, sighandler);
+	org_winch_handler = NULL;
+	org_winch_handler_sa = NULL;
+	sigaction(SIGWINCH, &act, &oact);
+	if (oact.sa_flags & SA_SIGINFO)
+	{
+		org_winch_handler_sa = oact.sa_sigaction;
+	}
+	else if (oact.sa_handler != SIG_DFL && oact.sa_handler != SIG_IGN)
+	{
+		org_winch_handler = oact.sa_handler;
+	}
 #endif
-#ifndef _WIN32
-	signal(SIGCHLD, sighandler);
+	sigaction(SIGCHLD, &act, NULL);
+	sigaction(SIGINT, &act, NULL);
 	signal(SIGPIPE, SIG_IGN);
-#endif
-	signal(SIGINT, sighandler);
 
 #if !GLIB_CHECK_VERSION(2, 36, 0)
 	/* GLib type system is automaticaly initialized since 2.36. */
