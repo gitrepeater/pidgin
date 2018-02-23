@@ -130,7 +130,7 @@ static void destroy_stats(gpointer data) {
 	/* g_free(stats->hourly_usage); */
 	/* g_free(stats->daily_usage); */
 	if (stats->timeout_source_id != 0)
-		purple_timeout_remove(stats->timeout_source_id);
+		g_source_remove(stats->timeout_source_id);
 	g_free(stats);
 }
 
@@ -359,9 +359,9 @@ static void sent_im_msg(PurpleAccount *account, PurpleMessage *msg, gpointer _un
 	stats->last_message = time(NULL);
 	stats->last_message_status_id = purple_status_get_id(get_status_for(buddy));
 	if(stats->timeout_source_id != 0)
-		purple_timeout_remove(stats->timeout_source_id);
+		g_source_remove(stats->timeout_source_id);
 
-	stats->timeout_source_id = purple_timeout_add_seconds(interval, max_message_difference_cb, stats);
+	stats->timeout_source_id = g_timeout_add_seconds(interval, max_message_difference_cb, stats);
 }
 
 /* received-im-msg */
@@ -387,7 +387,7 @@ received_im_msg(PurpleAccount *account, char *sender, char *message, PurpleConve
 	 * then cancel the timeout callback. */
 	if(stats->timeout_source_id != 0) {
 		purple_debug_info("cap", "Cancelling timeout callback\n");
-		purple_timeout_remove(stats->timeout_source_id);
+		g_source_remove(stats->timeout_source_id);
 		stats->timeout_source_id = 0;
 	}
 
@@ -616,7 +616,7 @@ static void insert_status_change_from_purple_status(CapStatistics *statistics, P
 	/* It would seem that some protocols receive periodic updates of the buddies status.
 	 * Check to make sure the last status is not the same as current status to prevent
 	 * to many duplicated useless database entries. */
-	if(strcmp(statistics->last_status_id, purple_status_get_id(status)) == 0)
+	if(purple_strequal(statistics->last_status_id, purple_status_get_id(status)))
 		return;
 
 	status_id = purple_status_get_id(status);
@@ -678,7 +678,7 @@ static void add_plugin_functionality(PurplePlugin *plugin) {
 static void cancel_conversation_timeouts(gpointer key, gpointer value, gpointer user_data) {
 	CapStatistics *stats = value;
 	if(stats->timeout_source_id != 0) {
-		purple_timeout_remove(stats->timeout_source_id);
+		g_source_remove(stats->timeout_source_id);
 		stats->timeout_source_id = 0;
 	}
 }
@@ -730,68 +730,59 @@ static void write_stats_on_unload(gpointer key, gpointer value, gpointer user_da
 static CapPrefsUI * create_cap_prefs_ui() {
 	CapPrefsUI *ui = g_malloc(sizeof(CapPrefsUI));
 
-	ui->ret = gtk_vbox_new(FALSE, 18);
+	ui->ret = gtk_box_new(GTK_ORIENTATION_VERTICAL, 18);
 	gtk_container_set_border_width(GTK_CONTAINER(ui->ret), 10);
 	ui->cap_vbox = pidgin_make_frame(ui->ret, _("Statistics Configuration"));
 
 	/* msg_difference spinner */
 	ui->msg_difference_label = gtk_label_new(_("Maximum response timeout:"));
-	gtk_misc_set_alignment(GTK_MISC(ui->msg_difference_label), 0, 0.5);
+	gtk_label_set_xalign(GTK_LABEL(ui->msg_difference_label), 0);
 	ui->msg_difference_input = gtk_spin_button_new_with_range(1, 1440, 1);
 	ui->msg_difference_minutes_label = gtk_label_new(_("minutes"));
-	gtk_misc_set_alignment(GTK_MISC(ui->msg_difference_minutes_label), 0, 0.5);
+	gtk_label_set_xalign(GTK_LABEL(ui->msg_difference_minutes_label), 0);
 
 	/* last_seen spinner */
 	ui->last_seen_label = gtk_label_new(_("Maximum last-seen difference:"));
-	gtk_misc_set_alignment(GTK_MISC(ui->last_seen_label), 0, 0.5);
+	gtk_label_set_xalign(GTK_LABEL(ui->last_seen_label), 0);
 	ui->last_seen_input = gtk_spin_button_new_with_range(1, 1440, 1);
 	ui->last_seen_minutes_label = gtk_label_new(_("minutes"));
-	gtk_misc_set_alignment(GTK_MISC(ui->last_seen_minutes_label), 0, 0.5);
+	gtk_label_set_xalign(GTK_LABEL(ui->last_seen_minutes_label), 0);
 
 	/* threshold spinner */
 	ui->threshold_label = gtk_label_new(_("Threshold:"));
-	gtk_misc_set_alignment(GTK_MISC(ui->threshold_label), 0, 0.5);
+	gtk_label_set_xalign(GTK_LABEL(ui->threshold_label), 0);
 	ui->threshold_input = gtk_spin_button_new_with_range(1, 1440, 1);
 	ui->threshold_minutes_label = gtk_label_new(_("minutes"));
-	gtk_misc_set_alignment(GTK_MISC(ui->threshold_minutes_label), 0, 0.5);
+	gtk_label_set_xalign(GTK_LABEL(ui->threshold_minutes_label), 0);
 
 	/* Layout threshold/last-seen/response-timeout input items */
-	ui->table_layout = gtk_table_new(3, 3, FALSE);
-	gtk_table_attach(GTK_TABLE(ui->table_layout), ui->threshold_label, 0, 1, 0, 1,
-		(GtkAttachOptions) (GTK_EXPAND | GTK_FILL),
-		(GtkAttachOptions) (0), 0, 0);
+	ui->table_layout = gtk_grid_new();
+	gtk_grid_attach(GTK_GRID(ui->table_layout), ui->threshold_label, 0, 0, 1, 1);
+	gtk_widget_set_hexpand(ui->threshold_label, TRUE);
 
-	gtk_table_attach(GTK_TABLE(ui->table_layout), ui->threshold_input, 1, 2, 0, 1,
-		(GtkAttachOptions) (GTK_EXPAND | GTK_FILL),
-		(GtkAttachOptions) (0), 0, 0);
+	gtk_grid_attach(GTK_GRID(ui->table_layout), ui->threshold_input, 1, 0, 1, 1);
+	gtk_widget_set_hexpand(ui->threshold_input, TRUE);
 
-	gtk_table_attach(GTK_TABLE(ui->table_layout), ui->threshold_minutes_label, 2, 3, 0, 1,
-		(GtkAttachOptions) (GTK_EXPAND | GTK_FILL),
-		(GtkAttachOptions) (0), 0, 0);
+	gtk_grid_attach(GTK_GRID(ui->table_layout), ui->threshold_minutes_label, 2, 0, 1, 1);
+	gtk_widget_set_hexpand(ui->threshold_minutes_label, TRUE);
 
-	gtk_table_attach(GTK_TABLE(ui->table_layout), ui->msg_difference_label, 0, 1, 1, 2,
-		(GtkAttachOptions) (GTK_EXPAND | GTK_FILL),
-		(GtkAttachOptions) (0), 0, 0);
+	gtk_grid_attach(GTK_GRID(ui->table_layout), ui->msg_difference_label, 0, 1, 1, 1);
+	gtk_widget_set_hexpand(ui->msg_difference_label, TRUE);
 
-	gtk_table_attach(GTK_TABLE(ui->table_layout), ui->msg_difference_input, 1, 2, 1, 2,
-		(GtkAttachOptions) (GTK_EXPAND | GTK_FILL),
-		(GtkAttachOptions) (0), 0, 0);
+	gtk_grid_attach(GTK_GRID(ui->table_layout), ui->msg_difference_input, 1, 1, 1, 1);
+	gtk_widget_set_hexpand(ui->msg_difference_input, TRUE);
 
-	gtk_table_attach(GTK_TABLE(ui->table_layout), ui->msg_difference_minutes_label, 2, 3, 1, 2,
-		(GtkAttachOptions) (GTK_EXPAND | GTK_FILL),
-		(GtkAttachOptions) (0), 0, 0);
+	gtk_grid_attach(GTK_GRID(ui->table_layout), ui->msg_difference_minutes_label, 2, 1, 1, 1);
+	gtk_widget_set_hexpand(ui->msg_difference_minutes_label, TRUE);
 
-	gtk_table_attach(GTK_TABLE(ui->table_layout), ui->last_seen_label, 0, 1, 2,3,
-		(GtkAttachOptions) (GTK_EXPAND | GTK_FILL),
-		(GtkAttachOptions) (0), 0, 0);
+	gtk_grid_attach(GTK_GRID(ui->table_layout), ui->last_seen_label, 0, 2, 1, 1);
+	gtk_widget_set_hexpand(ui->last_seen_label, TRUE);
 
-	gtk_table_attach(GTK_TABLE(ui->table_layout), ui->last_seen_input, 1, 2, 2, 3,
-		(GtkAttachOptions) (GTK_EXPAND | GTK_FILL),
-		(GtkAttachOptions) (0), 0, 0);
+	gtk_grid_attach(GTK_GRID(ui->table_layout), ui->last_seen_input, 1, 2, 1, 1);
+	gtk_widget_set_hexpand(ui->last_seen_input, TRUE);
 
-	gtk_table_attach(GTK_TABLE(ui->table_layout), ui->last_seen_minutes_label, 2, 3, 2, 3,
-		(GtkAttachOptions) (GTK_EXPAND | GTK_FILL),
-		(GtkAttachOptions) (0), 0, 0);
+	gtk_grid_attach(GTK_GRID(ui->table_layout), ui->last_seen_minutes_label, 2, 2, 1, 1);
+	gtk_widget_set_hexpand(ui->last_seen_minutes_label, TRUE);
 
 
 	/* Config window - lay it out */

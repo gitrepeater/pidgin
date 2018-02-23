@@ -719,10 +719,13 @@ gg_create_menu(FinchConv *ggc)
 		gnt_menu_add_item(GNT_MENU(sub), item);
 		gnt_menuitem_set_callback(item, add_pounce_cb, ggc);
 
-		if (protocol && PURPLE_PROTOCOL_IMPLEMENTS(protocol, XFER_IFACE, send) &&
-				(!PURPLE_PROTOCOL_IMPLEMENTS(protocol, XFER_IFACE, can_receive) ||
-					purple_protocol_xfer_iface_can_receive(protocol, gc,
-					purple_conversation_get_name(ggc->active_conv)))) {
+		if (PURPLE_IS_PROTOCOL_XFER(protocol) &&
+			purple_protocol_xfer_can_receive(
+				PURPLE_PROTOCOL_XFER(protocol),
+				gc,
+				purple_conversation_get_name(ggc->active_conv)
+			)
+		) {
 			item = gnt_menuitem_new(_("Send File"));
 			gnt_menu_add_item(GNT_MENU(sub), item);
 			gnt_menuitem_set_callback(item, send_file_cb, ggc);
@@ -1368,15 +1371,15 @@ cmd_message_color(PurpleConversation *conv, const char *cmd, char **args, char *
 	int *msgclass  = NULL;
 	int fg, bg;
 
-	if (strcmp(args[0], "receive") == 0)
+	if (purple_strequal(args[0], "receive"))
 		msgclass = &color_message_receive;
-	else if (strcmp(args[0], "send") == 0)
+	else if (purple_strequal(args[0], "send"))
 		msgclass = &color_message_send;
-	else if (strcmp(args[0], "highlight") == 0)
+	else if (purple_strequal(args[0], "highlight"))
 		msgclass = &color_message_highlight;
-	else if (strcmp(args[0], "action") == 0)
+	else if (purple_strequal(args[0], "action"))
 		msgclass = &color_message_action;
-	else if (strcmp(args[0], "timestamp") == 0)
+	else if (purple_strequal(args[0], "timestamp"))
 		msgclass = &color_timestamp;
 	else {
 		if (error)

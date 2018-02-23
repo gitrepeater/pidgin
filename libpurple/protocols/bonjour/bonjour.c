@@ -100,8 +100,7 @@ bonjour_login(PurpleAccount *account)
 		purple_connection_error(gc,
 				PURPLE_CONNECTION_ERROR_OTHER_ERROR,
 				_("Unable to find Apple's \"Bonjour for Windows\" toolkit, see "
-				  "https://developer.pidgin.im/BonjourWindows for more "
-				  "information."));
+				  "https://developer.pidgin.im/BonjourWindows for more information."));
 		return;
 	}
 #endif /* _WIN32 */
@@ -467,7 +466,7 @@ bonjour_rename_group(PurpleConnection *connection, const char *old_name, PurpleG
 }
 
 static gboolean
-bonjour_can_receive_file(PurpleConnection *connection, const char *who)
+bonjour_can_receive_file(PurpleProtocolXfer *prplxfer, PurpleConnection *connection, const char *who)
 {
 	PurpleBuddy *buddy = purple_blist_find_buddy(purple_connection_get_account(connection), who);
 
@@ -510,9 +509,9 @@ _set_default_name_cb(gpointer data) {
 
 	for(; tmp != NULL; tmp = tmp->next) {
 		option = tmp->data;
-		if (strcmp("first", purple_account_option_get_setting(option)) == 0)
+		if (purple_strequal("first", purple_account_option_get_setting(option)))
 			purple_account_option_set_default_string(option, default_firstname);
-		else if (strcmp("last", purple_account_option_get_setting(option)) == 0)
+		else if (purple_strequal("last", purple_account_option_get_setting(option)))
 			purple_account_option_set_default_string(option, default_lastname);
 	}
 
@@ -565,7 +564,7 @@ _win32_name_lookup_thread(gpointer data) {
 			fullname = g_utf16_to_utf8(username, -1, NULL, NULL, NULL);
 	}
 
-	purple_timeout_add(0, _set_default_name_cb, fullname);
+	g_timeout_add(0, _set_default_name_cb, fullname);
 
 	return NULL;
 }
@@ -700,7 +699,7 @@ bonjour_protocol_im_iface_init(PurpleProtocolIMIface *im_iface)
 }
 
 static void
-bonjour_protocol_xfer_iface_init(PurpleProtocolXferIface *xfer_iface)
+bonjour_protocol_xfer_iface_init(PurpleProtocolXferInterface *xfer_iface)
 {
 	xfer_iface->can_receive = bonjour_can_receive_file;
 	xfer_iface->send        = bonjour_send_file;
@@ -719,7 +718,7 @@ PURPLE_DEFINE_TYPE_EXTENDED(
 	PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_IM_IFACE,
 	                                  bonjour_protocol_im_iface_init)
 
-	PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_XFER_IFACE,
+	PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_XFER,
 	                                  bonjour_protocol_xfer_iface_init)
 );
 

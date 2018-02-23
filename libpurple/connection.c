@@ -39,6 +39,8 @@
 #include "signals.h"
 #include "util.h"
 
+G_DEFINE_QUARK(purple-connection-error-quark, purple_connection_error);
+
 #define KEEPALIVE_INTERVAL 30
 
 #define PURPLE_CONNECTION_GET_PRIVATE(obj) \
@@ -144,12 +146,12 @@ update_keepalive(PurpleConnection *gc, gboolean on)
 	if (on && !priv->keepalive)
 	{
 		purple_debug_info("connection", "Activating keepalive.\n");
-		priv->keepalive = purple_timeout_add_seconds(KEEPALIVE_INTERVAL, send_keepalive, gc);
+		priv->keepalive = g_timeout_add_seconds(KEEPALIVE_INTERVAL, send_keepalive, gc);
 	}
 	else if (!on && priv->keepalive > 0)
 	{
 		purple_debug_info("connection", "Deactivating keepalive.\n");
-		purple_timeout_remove(priv->keepalive);
+		g_source_remove(priv->keepalive);
 		priv->keepalive = 0;
 	}
 }
@@ -204,10 +206,11 @@ purple_connection_set_state(PurpleConnection *gc, PurpleConnectionState state)
 			{
 				char *msg = g_strdup_printf(_("+++ %s signed on"),
 											purple_account_get_username(account));
+				GDateTime *dt = g_date_time_new_from_unix_local(purple_presence_get_login_time(presence));
 				purple_log_write(log, PURPLE_MESSAGE_SYSTEM,
-							   purple_account_get_username(account),
-							   purple_presence_get_login_time(presence),
-							   msg);
+				                 purple_account_get_username(account),
+				                 dt, msg);
+				g_date_time_unref(dt);
 				g_free(msg);
 			}
 		}
@@ -235,9 +238,11 @@ purple_connection_set_state(PurpleConnection *gc, PurpleConnectionState state)
 			{
 				char *msg = g_strdup_printf(_("+++ %s signed off"),
 											purple_account_get_username(account));
+				GDateTime *dt = g_date_time_new_now_utc();
 				purple_log_write(log, PURPLE_MESSAGE_SYSTEM,
-							   purple_account_get_username(account), time(NULL),
-							   msg);
+				                 purple_account_get_username(account),
+				                 dt, msg);
+				g_date_time_unref(dt);
 				g_free(msg);
 			}
 		}
@@ -502,7 +507,7 @@ purple_connection_error (PurpleConnection *gc,
 	purple_signal_emit(purple_connections_get_handle(), "connection-error",
 		gc, reason, description);
 
-	priv->disconnect_timeout = purple_timeout_add(0, purple_connection_disconnect_cb,
+	priv->disconnect_timeout = g_timeout_add(0, purple_connection_disconnect_cb,
 			purple_connection_get_account(gc));
 }
 
@@ -543,11 +548,9 @@ purple_connection_ssl_error (PurpleConnection *gc,
 }
 
 void
-purple_connection_g_error(PurpleConnection *pc, const GError *error,
-		const gchar *description)
+purple_connection_g_error(PurpleConnection *pc, const GError *error)
 {
 	PurpleConnectionError reason;
-	gchar *tmp;
 
 	if (g_error_matches(error, G_IO_ERROR, G_IO_ERROR_CANCELLED)) {
 		/* Not a connection error. Ignore. */
@@ -574,13 +577,20 @@ purple_connection_g_error(PurpleConnection *pc, const GError *error,
 		}
 	} else if (error->domain == G_IO_ERROR) {
 		reason = PURPLE_CONNECTION_ERROR_NETWORK_ERROR;
+	} else if (error->domain == PURPLE_CONNECTION_ERROR) {
+		reason = error->code;
 	} else {
 		reason = PURPLE_CONNECTION_ERROR_OTHER_ERROR;
 	}
 
-	tmp = g_strdup_printf(description, error->message);
-	purple_connection_error(pc, reason, tmp);
-	g_free(tmp);
+	purple_connection_error(pc, reason, error->message);
+}
+
+void
+purple_connection_take_error(PurpleConnection *pc, GError *error)
+{
+	purple_connection_g_error(pc, error);
+	g_error_free(error);
 }
 
 gboolean
@@ -838,7 +848,6 @@ purple_connection_finalize(GObject *object)
 	}
 
 	purple_http_conn_cancel_all(gc);
-	_purple_socket_cancel_with_connection(gc);
 	purple_proxy_connect_cancel_with_handle(gc);
 
 	connections = g_list_remove(connections, gc);
@@ -862,7 +871,7 @@ purple_connection_finalize(GObject *object)
 		purple_connection_error_info_free(priv->error_info);
 
 	if (priv->disconnect_timeout > 0)
-		purple_timeout_remove(priv->disconnect_timeout);
+		g_source_remove(priv->disconnect_timeout);
 
 	purple_str_wipe(priv->password);
 	g_free(priv->display_name);

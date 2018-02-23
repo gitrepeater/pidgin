@@ -41,6 +41,17 @@
 #define AIM_DEFAULT_KDC_SERVER "kdc.uas.aol.com"
 #define AIM_DEFAULT_KDC_PORT 443
 
+/*
+ * Using clientLogin requires a developer ID.  This key is for libpurple.
+ * It is the default key for all libpurple-based clients.  AOL encourages
+ * UIs (especially ones with lots of users) to override this with their
+ * own key.
+ */
+#define ICQ_DEFAULT_DIST_ID 1553
+#define ICQ_DEFAULT_CLIENT_KEY "ma15d7JTxbmVG-RP"
+#define AIM_DEFAULT_DIST_ID 1717
+#define AIM_DEFAULT_CLIENT_KEY "ma19CwYN9i9Mw5nY"
+
 #define OSCAR_DEFAULT_LOGIN_PORT 5190
 
 #define OSCAR_OPPORTUNISTIC_ENCRYPTION "opportunistic_encryption"
@@ -105,9 +116,9 @@ void oscar_convo_closed(PurpleConnection *gc, const char *who);
 const char *oscar_normalize(const PurpleAccount *account, const char *str);
 void oscar_set_icon(PurpleConnection *gc, PurpleImage *img);
 void oscar_remove_group(PurpleConnection *gc, PurpleGroup *group);
-gboolean oscar_can_receive_file(PurpleConnection *gc, const char *who);
-void oscar_send_file(PurpleConnection *gc, const char *who, const char *file);
-PurpleXfer *oscar_new_xfer(PurpleConnection *gc, const char *who);
+gboolean oscar_can_receive_file(PurpleProtocolXfer *prplxfer, PurpleConnection *gc, const char *who);
+void oscar_send_file(PurpleProtocolXfer *prplxfer, PurpleConnection *gc, const char *who, const char *file);
+PurpleXfer *oscar_new_xfer(PurpleProtocolXfer *prplxfer, PurpleConnection *gc, const char *who);
 gboolean oscar_offline_message(const PurpleBuddy *buddy);
 gssize oscar_get_max_message_size(PurpleConversation *conv);
 GList *oscar_get_actions(PurpleConnection *gc);

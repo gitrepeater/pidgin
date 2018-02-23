@@ -183,7 +183,7 @@ set_dialog_icon(AccountPrefsDialog *dialog, gpointer data, size_t len, gchar *ne
 	}
 
 	if (new_icon_path != NULL) {
-		dialog->icon_img = purple_image_new_from_file(new_icon_path, TRUE);
+		dialog->icon_img = purple_image_new_from_file(new_icon_path, NULL);
 		purple_debug_warning("gtkaccount", "data was not necessary");
 		g_free(data);
 	} else if (data != NULL) {
@@ -304,105 +304,6 @@ username_changed_cb(GtkEntry *entry, AccountPrefsDialog *dialog)
 	}
 }
 
-#if !GTK_CHECK_VERSION(3,2,0)
-static gboolean
-username_focus_cb(GtkWidget *widget, GdkEventFocus *event, AccountPrefsDialog *dialog)
-{
-	GHashTable *table;
-	const char *label;
-
-	if (!dialog->protocol || ! PURPLE_PROTOCOL_IMPLEMENTS(
-		dialog->protocol, CLIENT_IFACE, get_account_text_table)) {
-		return FALSE;
-	}
-
-	table = purple_protocol_client_iface_get_account_text_table(dialog->protocol, NULL);
-	label = g_hash_table_lookup(table, "login_label");
-
-	if(!strcmp(gtk_entry_get_text(GTK_ENTRY(widget)), label)) {
-		gtk_entry_set_text(GTK_ENTRY(widget), "");
-		gtk_widget_override_color(widget, GTK_STATE_NORMAL, NULL);
-	}
-
-	g_hash_table_destroy(table);
-
-	return FALSE;
-}
-
-static gboolean
-username_nofocus_cb(GtkWidget *widget, GdkEventFocus *event, AccountPrefsDialog *dialog)
-{
-	GHashTable *table = NULL;
-	const char *label = NULL;
-
-	if (PURPLE_PROTOCOL_IMPLEMENTS(dialog->protocol, CLIENT_IFACE, get_account_text_table)) {
-		table = purple_protocol_client_iface_get_account_text_table(dialog->protocol, NULL);
-		label = g_hash_table_lookup(table, "login_label");
-
-		if (*gtk_entry_get_text(GTK_ENTRY(widget)) == '\0') {
-			/* We have to avoid hitting the username_changed_cb function
-			 * because it enables buttons we don't want enabled yet ;)
-			 */
-			g_signal_handlers_block_by_func(widget, G_CALLBACK(username_changed_cb), dialog);
-			gtk_entry_set_text(GTK_ENTRY(widget), label);
-			/* Make sure we can hit it again */
-			g_signal_handlers_unblock_by_func(widget, G_CALLBACK(username_changed_cb), dialog);
-			gtk_widget_override_color(widget, GTK_STATE_NORMAL, &dialog->username_entry_hint_color);
-		}
-
-		g_hash_table_destroy(table);
-	}
-
-	return FALSE;
-}
-
-static gboolean
-username_themechange_cb(GObject *widget, GdkEventFocus *event, AccountPrefsDialog *dialog)
-{
-	GHashTable *table;
-	const char *label, *text;
-	char *temp_text = NULL;
-	GtkStyleContext *context;
-	GtkBorder border;
-	gint xsize;
-
-	table = purple_protocol_client_iface_get_account_text_table(dialog->protocol, NULL);
-	label = g_hash_table_lookup(table, "login_label");
-	text = gtk_entry_get_text(GTK_ENTRY(widget));
-
-	g_signal_handlers_block_by_func(widget, G_CALLBACK(username_themechange_cb), dialog);
-	g_signal_handlers_block_by_func(widget, G_CALLBACK(username_changed_cb), dialog);
-	if (strcmp(text, label)) {
-		temp_text = g_strdup(text);
-		gtk_entry_set_text(GTK_ENTRY(widget), label);
-		gtk_widget_override_color(GTK_WIDGET(widget), GTK_STATE_NORMAL, NULL);
-	}
-
-	context = gtk_widget_get_style_context(dialog->username_entry);
-	gtk_style_context_get_color(context, GTK_STATE_FLAG_INSENSITIVE,
-	                            &dialog->username_entry_hint_color);
-
-	pango_layout_get_pixel_size(gtk_entry_get_layout(GTK_ENTRY(widget)), &xsize, NULL);
-	gtk_style_context_get_margin(context, GTK_STATE_FLAG_NORMAL, &border);
-	xsize += border.left + border.right;
-	gtk_style_context_get_padding(context, GTK_STATE_FLAG_NORMAL, &border);
-	xsize += border.left + border.right;
-	gtk_widget_set_size_request(GTK_WIDGET(widget), xsize, -1);
-	if (temp_text) {
-		gtk_entry_set_text(GTK_ENTRY(widget), temp_text);
-		g_free(temp_text);
-		gtk_widget_override_color(GTK_WIDGET(widget), GTK_STATE_NORMAL, NULL);
-	} else
-		gtk_widget_override_color(GTK_WIDGET(widget), GTK_STATE_NORMAL, &dialog->username_entry_hint_color);
-
-	g_signal_handlers_unblock_by_func(widget, G_CALLBACK(username_themechange_cb), dialog);
-	g_signal_handlers_unblock_by_func(widget, G_CALLBACK(username_changed_cb), dialog);
-	g_hash_table_destroy(table);
-
-	return FALSE;
-}
-#endif
-
 static void
 register_button_cb(GtkWidget *checkbox, AccountPrefsDialog *dialog)
 {
@@ -411,11 +312,6 @@ register_button_cb(GtkWidget *checkbox, AccountPrefsDialog *dialog)
 	int opt_noscreenname = (dialog->protocol != NULL &&
 		(purple_protocol_get_options(dialog->protocol) & OPT_PROTO_REGISTER_NOSCREENNAME));
 	int register_noscreenname = (opt_noscreenname && register_checked);
-
-#if !GTK_CHECK_VERSION(3,2,0)
-	/* get rid of login_label in username field */
-	username_focus_cb(dialog->username_entry, NULL, dialog);
-#endif
 
 	if (register_noscreenname) {
 		gtk_entry_set_text(GTK_ENTRY(dialog->username_entry), "");
@@ -432,10 +328,6 @@ register_button_cb(GtkWidget *checkbox, AccountPrefsDialog *dialog)
 			*gtk_entry_get_text(GTK_ENTRY(dialog->username_entry))
 				!= '\0');
 	}
-
-#if !GTK_CHECK_VERSION(3,2,0)
-	username_nofocus_cb(dialog->username_entry, NULL, dialog);
-#endif
 }
 
 static void
@@ -609,18 +501,7 @@ add_login_options(AccountPrefsDialog *dialog, GtkWidget *parent)
 		table = purple_protocol_client_iface_get_account_text_table(dialog->protocol, NULL);
 		label = g_hash_table_lookup(table, "login_label");
 
-#if GTK_CHECK_VERSION(3,2,0)
 		gtk_entry_set_placeholder_text(GTK_ENTRY(dialog->username_entry), label);
-#else
-		gtk_entry_set_text(GTK_ENTRY(dialog->username_entry), label);
-		username_themechange_cb(G_OBJECT(dialog->username_entry), NULL, dialog);
-		g_signal_connect(G_OBJECT(dialog->username_entry), "style-set",
-				G_CALLBACK(username_themechange_cb), dialog);
-		g_signal_connect(G_OBJECT(dialog->username_entry), "focus-in-event",
-				G_CALLBACK(username_focus_cb), dialog);
-		g_signal_connect(G_OBJECT(dialog->username_entry), "focus-out-event",
-				G_CALLBACK(username_nofocus_cb), dialog);
-#endif
 
 		g_hash_table_destroy(table);
 	}
@@ -854,7 +735,7 @@ add_user_options(AccountPrefsDialog *dialog, GtkWidget *parent)
 		img = purple_buddy_icons_find_account_icon(dialog->account);
 		if (img)
 		{
-			len = purple_image_get_size(img);
+			len = purple_image_get_data_size(img);
 			data = g_memdup(purple_image_get_data(img), len);
 		}
 		set_dialog_icon(dialog, data, len,
@@ -931,7 +812,7 @@ add_account_options(AccountPrefsDialog *dialog)
 		{
 			case PURPLE_PREF_BOOLEAN:
 				if (account == NULL ||
-					strcmp(purple_account_get_protocol_id(account),
+					!purple_strequal(purple_account_get_protocol_id(account),
 						   dialog->protocol_id))
 				{
 					bool_value = purple_account_option_get_default_bool(option);
@@ -956,7 +837,7 @@ add_account_options(AccountPrefsDialog *dialog)
 
 			case PURPLE_PREF_INT:
 				if (account == NULL ||
-					strcmp(purple_account_get_protocol_id(account),
+					!purple_strequal(purple_account_get_protocol_id(account),
 						   dialog->protocol_id))
 				{
 					int_value = purple_account_option_get_default_int(option);
@@ -981,7 +862,7 @@ add_account_options(AccountPrefsDialog *dialog)
 
 			case PURPLE_PREF_STRING:
 				if (account == NULL ||
-					strcmp(purple_account_get_protocol_id(account),
+					!purple_strequal(purple_account_get_protocol_id(account),
 						   dialog->protocol_id))
 				{
 					str_value = purple_account_option_get_default_string(option);
@@ -1034,7 +915,7 @@ add_account_options(AccountPrefsDialog *dialog)
 				idx = 0;
 
 				if (account == NULL ||
-					strcmp(purple_account_get_protocol_id(account),
+					!purple_strequal(purple_account_get_protocol_id(account),
 						   dialog->protocol_id))
 				{
 					str_value = purple_account_option_get_default_list_value(option);
@@ -1493,7 +1374,7 @@ ok_account_prefs_cb(GtkWidget *w, AccountPrefsDialog *dialog)
 		{
 			if (dialog->icon_img)
 			{
-				size_t len = purple_image_get_size(dialog->icon_img);
+				size_t len = purple_image_get_data_size(dialog->icon_img);
 				purple_buddy_icons_set_account_icon(account,
 					g_memdup(purple_image_get_data(dialog->icon_img), len), len);
 				purple_account_set_buddy_icon_path(account,
@@ -2252,7 +2133,7 @@ set_account(GtkListStore *store, GtkTreeIter *iter, PurpleAccount *account, GdkP
 				const char *path;
 				path = purple_prefs_get_path(PIDGIN_PREFS_ROOT "/accounts/buddyicon");
 				if ((path != NULL) && (*path != '\0')) {
-					img = purple_image_new_from_file(path, TRUE);
+					img = purple_image_new_from_file(path, NULL);
 				}
 			}
 		} else {
@@ -2367,7 +2248,7 @@ account_treeview_double_click_cb(GtkTreeView *treeview, GdkEventButton *event, g
 	gtk_tree_path_free(path);
 	gtk_tree_model_get(GTK_TREE_MODEL(dialog->model), &iter, COLUMN_DATA, &account, -1);
 
-	if ((account != NULL) && (event->button == 1) &&
+	if ((account != NULL) && (event->button == GDK_BUTTON_PRIMARY) &&
 		(event->type == GDK_2BUTTON_PRESS))
 	{
 		pidgin_account_dialog_show(PIDGIN_MODIFY_ACCOUNT_DIALOG, account);
@@ -2417,7 +2298,6 @@ create_accounts_list(AccountsWindow *dialog)
 	gtk_label_set_line_wrap(GTK_LABEL(label), TRUE);
 	gtk_widget_show(label);
 
-	gtk_misc_set_alignment(GTK_MISC(label), 0.5, 0.5);
 	gtk_notebook_append_page(GTK_NOTEBOOK(accounts_window->notebook), label, NULL);
 
 	/* Create the list model. */
@@ -2433,7 +2313,6 @@ create_accounts_list(AccountsWindow *dialog)
 	/* And now the actual treeview */
 	treeview = gtk_tree_view_new_with_model(GTK_TREE_MODEL(dialog->model));
 	dialog->treeview = treeview;
-	gtk_tree_view_set_rules_hint(GTK_TREE_VIEW(treeview), TRUE);
 	g_object_unref(G_OBJECT(dialog->model));
 
 	sel = gtk_tree_view_get_selection(GTK_TREE_VIEW(treeview));
@@ -2771,7 +2650,7 @@ get_user_info_cb(GtkWidget   *label,
                  gpointer     data)
 {
 	struct auth_request *ar = data;
-	if (!strcmp(uri, "viewinfo")) {
+	if (purple_strequal(uri, "viewinfo")) {
 		pidgin_retrieve_user_info(purple_account_get_connection(ar->account), ar->username);
 		return TRUE;
 	}

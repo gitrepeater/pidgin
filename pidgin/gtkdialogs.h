@@ -37,23 +37,19 @@ G_BEGIN_DECLS
 
 /* Functions in gtkdialogs.c (these should actually stay in this file) */
 void pidgin_dialogs_destroy_all(void);
-void pidgin_dialogs_about(void);
-void pidgin_dialogs_buildinfo(void);
-void pidgin_dialogs_developers(void);
-void pidgin_dialogs_translators(void);
 void pidgin_dialogs_plugins_info(void);
 void pidgin_dialogs_im(void);
-void pidgin_dialogs_im_with_user(PurpleAccount *, const char *);
+void pidgin_dialogs_im_with_user(PurpleAccount *account, const char *username);
 void pidgin_dialogs_info(void);
 void pidgin_dialogs_log(void);
 
-void pidgin_dialogs_alias_buddy(PurpleBuddy *);
-void pidgin_dialogs_alias_chat(PurpleChat *);
-void pidgin_dialogs_remove_buddy(PurpleBuddy *);
-void pidgin_dialogs_remove_group(PurpleGroup *);
-void pidgin_dialogs_remove_chat(PurpleChat *);
-void pidgin_dialogs_remove_contact(PurpleContact *);
-void pidgin_dialogs_merge_groups(PurpleGroup *, const char *);
+void pidgin_dialogs_alias_buddy(PurpleBuddy *buddy);
+void pidgin_dialogs_alias_chat(PurpleChat *chat);
+void pidgin_dialogs_remove_buddy(PurpleBuddy *buddy);
+void pidgin_dialogs_remove_group(PurpleGroup *group);
+void pidgin_dialogs_remove_chat(PurpleChat *chat);
+void pidgin_dialogs_remove_contact(PurpleContact *contact);
+void pidgin_dialogs_merge_groups(PurpleGroup *group, const char *name);
 
 G_END_DECLS
 

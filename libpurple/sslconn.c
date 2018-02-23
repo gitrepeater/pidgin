@@ -254,8 +254,7 @@ purple_ssl_connect_with_host_fd(PurpleAccount *account, int fd,
 	gsc->connect_cb      = func;
 	gsc->error_cb        = error_func;
 	gsc->fd              = fd;
-    if(host)
-        gsc->host            = g_strdup(host);
+	gsc->host            = g_strdup(host);
 	gsc->cancellable     = g_cancellable_new();
 
 	if (!tls_connect(gsc)) {
@@ -272,7 +271,7 @@ connection_closed_cb(GObject *stream, GAsyncResult *result,
 {
 	GError *error = NULL;
 
-	purple_timeout_remove(GPOINTER_TO_UINT(timeout_id));
+	g_source_remove(GPOINTER_TO_UINT(timeout_id));
 
 	g_io_stream_close_finish(G_IO_STREAM(stream), result, &error);
 
@@ -319,7 +318,7 @@ purple_ssl_close(PurpleSslConnection *gsc)
 		g_object_weak_ref(G_OBJECT(gsc->conn), cleanup_cancellable_cb,
 				cancellable);
 
-		timer_id = purple_timeout_add_seconds(CONNECTION_CLOSE_TIMEOUT,
+		timer_id = g_timeout_add_seconds(CONNECTION_CLOSE_TIMEOUT,
 				(GSourceFunc)g_cancellable_cancel, cancellable);
 
 		g_io_stream_close_async(G_IO_STREAM(gsc->conn),

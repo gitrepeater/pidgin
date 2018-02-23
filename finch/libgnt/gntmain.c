@@ -340,12 +340,6 @@ io_invoke(GIOChannel *source, GIOCondition cond, gpointer null)
 	}
 	*k = '\0';
 
-#if 0
-	gnt_warning("a key: [%s] %#x %#x %#x %#x %#x %#x", keys,
-		(guchar)keys[0], (guchar)keys[1], (guchar)keys[2],
-		(guchar)keys[3], (guchar)keys[4], (guchar)keys[5]);
-#endif
-
 	/* TODO: we could call detect_mouse_action here, but no
 	 * events are triggered (yet?) for mouse on win32.
 	 */
@@ -395,17 +389,6 @@ io_invoke(GIOChannel *source, GIOCondition cond, gpointer null)
 	if (mouse_enabled && detect_mouse_action(k))
 		goto end;
 
-#if 0
-	/* I am not sure what's happening here. If this actually does something,
-	 * then this needs to go in gnt_keys_refine. */
-	if (*k < 0) { /* Alt not sending ESC* */
-		*(k + 1) = 128 - *k;
-		*k = 27;
-		*(k + 2) = 0;
-		rd++;
-	}
-#endif
-
 	while (rd) {
 		char back;
 		int p;
@@ -450,12 +433,6 @@ setup_io()
 
 	g_io_channel_set_close_on_unref(channel, TRUE);
 
-#if 0
-	g_io_channel_set_encoding(channel, NULL, NULL);
-	g_io_channel_set_buffered(channel, FALSE);
-	g_io_channel_set_flags(channel, G_IO_FLAG_NONBLOCK, NULL );
-#endif
-
 	channel_read_callback = result = g_io_add_watch_full(channel,  G_PRIORITY_HIGH,
 					(G_IO_IN | G_IO_HUP | G_IO_ERR | G_IO_PRI),
 					io_invoke, NULL, NULL);
@@ -465,10 +442,6 @@ setup_io()
 					io_invoke_error, GINT_TO_POINTER(result), NULL);
 
 	g_io_channel_unref(channel);
-
-#if 0
-	gnt_warning("setting up IO (%d)", channel_read_callback);
-#endif
 }
 
 static gboolean
@@ -551,10 +524,11 @@ raise:
 
 #ifdef SIGWINCH
 static void (*org_winch_handler)(int);
+static void (*org_winch_handler_sa)(int, siginfo_t *, void *);
 #endif
 
 static void
-sighandler(int sig)
+sighandler(int sig, siginfo_t *info, void *data)
 {
 	switch (sig) {
 #ifdef SIGWINCH
@@ -563,18 +537,17 @@ sighandler(int sig)
 		g_idle_add((GSourceFunc)refresh_screen, NULL);
 		if (org_winch_handler)
 			org_winch_handler(sig);
-		signal(SIGWINCH, sighandler);
+		if (org_winch_handler_sa)
+			org_winch_handler_sa(sig, info, data);
 		break;
 #endif
 #ifndef _WIN32
 	case SIGCHLD:
 		clean_pid();
-		signal(SIGCHLD, sighandler);
 		break;
 #endif
 	case SIGINT:
 		ask_before_exit();
-		signal(SIGINT, sighandler);
 		break;
 	}
 }
@@ -602,6 +575,10 @@ void gnt_init()
 {
 	char *filename;
 	const char *locale;
+	struct sigaction act;
+#ifdef SIGWINCH
+	struct sigaction oact;
+#endif
 
 	if (channel)
 		return;
@@ -654,14 +631,26 @@ void gnt_init()
 	werase(stdscr);
 	wrefresh(stdscr);
 
+	act.sa_sigaction = sighandler;
+	sigemptyset(&act.sa_mask);
+	act.sa_flags = SA_SIGINFO;
+
 #ifdef SIGWINCH
-	org_winch_handler = signal(SIGWINCH, sighandler);
+	org_winch_handler = NULL;
+	org_winch_handler_sa = NULL;
+	sigaction(SIGWINCH, &act, &oact);
+	if (oact.sa_flags & SA_SIGINFO)
+	{
+		org_winch_handler_sa = oact.sa_sigaction;
+	}
+	else if (oact.sa_handler != SIG_DFL && oact.sa_handler != SIG_IGN)
+	{
+		org_winch_handler = oact.sa_handler;
+	}
 #endif
-#ifndef _WIN32
-	signal(SIGCHLD, sighandler);
+	sigaction(SIGCHLD, &act, NULL);
+	sigaction(SIGINT, &act, NULL);
 	signal(SIGPIPE, SIG_IGN);
-#endif
-	signal(SIGINT, sighandler);
 
 #if !GLIB_CHECK_VERSION(2, 36, 0)
 	/* GLib type system is automaticaly initialized since 2.36. */

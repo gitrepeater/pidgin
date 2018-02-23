@@ -127,10 +127,6 @@ static void add_group(PurpleGroup *group, FinchBlist *ggblist);
 static void add_chat(PurpleChat *chat, FinchBlist *ggblist);
 static void add_node(PurpleBlistNode *node, FinchBlist *ggblist);
 static void node_update(PurpleBuddyList *list, PurpleBlistNode *node);
-#if 0
-static gboolean is_contact_online(PurpleContact *contact);
-static gboolean is_group_online(PurpleGroup *group);
-#endif
 static void draw_tooltip(FinchBlist *ggblist);
 static void tooltip_for_buddy(PurpleBuddy *buddy, GString *str, gboolean full);
 static gboolean remove_typing_cb(gpointer null);
@@ -338,7 +334,7 @@ reset_blist_node_ui_data(PurpleBlistNode *node)
 	if (fnode == NULL)
 		return;
 	if (fnode->signed_timer)
-		purple_timeout_remove(fnode->signed_timer);
+		g_source_remove(fnode->signed_timer);
 	g_free(fnode);
 	purple_blist_node_set_ui_data(node, NULL);
 }
@@ -385,27 +381,6 @@ get_blist_node_flag(PurpleBlistNode *node)
 		fnode = purple_blist_node_get_ui_data(node);
 		if (fnode && fnode->signed_timer)
 			flag |= GNT_TEXT_FLAG_BLINK;
-	} else if (PURPLE_IS_GROUP(node)) {
-		/* If the node is collapsed, then check to see if any of the priority buddies of
-		 * any of the contacts within this group recently signed on/off, and set the blink
-		 * flag appropriately. */
-		/* XXX: Refs #5444 */
-		/* XXX: there's no way I can ask if the node is expanded or not? *sigh*
-		 * API addition would be necessary */
-#if 0
-		if (!gnt_tree_get_expanded(GNT_TREE(ggblist->tree), node)) {
-			for (node = purple_blist_node_get_first_child(node); node;
-					node = purple_blist_node_get_sibling_next(node)) {
-				PurpleBlistNode *pnode;
-				pnode = purple_contact_get_priority_buddy((PurpleContact*)node);
-				fnode = purple_blist_node_get_ui_data(node);
-				if (fnode && fnode->signed_timer) {
-					flag |= GNT_TEXT_FLAG_BLINK;
-					break;
-				}
-			}
-		}
-#endif
 	}
 
 	return flag;
@@ -417,37 +392,6 @@ blist_update_row_flags(PurpleBlistNode *node)
 	gnt_tree_set_row_flags(GNT_TREE(ggblist->tree), node, get_blist_node_flag(node));
 	gnt_tree_set_row_color(GNT_TREE(ggblist->tree), node, get_display_color(node));
 }
-
-#if 0
-static gboolean
-is_contact_online(PurpleContact *contact)
-{
-	PurpleBlistNode *node;
-	for (node = purple_blist_node_get_first_child(((PurpleBlistNode*)contact)); node;
-			node = purple_blist_node_get_sibling_next(node)) {
-		FinchBlistNode *fnode = purple_blist_node_get_ui_data(node);
-		if (PURPLE_BUDDY_IS_ONLINE((PurpleBuddy*)node) ||
-				(fnode && fnode->signed_timer))
-			return TRUE;
-	}
-	return FALSE;
-}
-
-static gboolean
-is_group_online(PurpleGroup *group)
-{
-	PurpleBlistNode *node;
-	for (node = purple_blist_node_get_first_child(((PurpleBlistNode*)group)); node;
-			node = purple_blist_node_get_sibling_next(node)) {
-		if (PURPLE_IS_CHAT(node) &&
-				purple_account_is_connected(((PurpleChat *)node)->account))
-			return TRUE;
-		else if (is_contact_online((PurpleContact*)node))
-			return TRUE;
-	}
-	return FALSE;
-}
-#endif
 
 static void
 new_node(PurpleBlistNode *node)
@@ -816,8 +760,8 @@ add_group_cb(gpointer null, const char *group)
 	 * to turn on 'show empty groups' setting */
 	ggblist->new_group = g_list_prepend(ggblist->new_group, grp);
 	if (ggblist->new_group_timeout)
-		purple_timeout_remove(ggblist->new_group_timeout);
-	ggblist->new_group_timeout = purple_timeout_add_seconds(SHOW_EMPTY_GROUP_TIMEOUT,
+		g_source_remove(ggblist->new_group_timeout);
+	ggblist->new_group_timeout = g_timeout_add_seconds(SHOW_EMPTY_GROUP_TIMEOUT,
 			remove_new_empty_group, NULL);
 
 	/* Select the group */
@@ -999,20 +943,6 @@ add_buddy(PurpleBuddy *buddy, FinchBlist *ggblist)
 		blist_update_row_flags((PurpleBlistNode*)contact);
 }
 
-#if 0
-static void
-buddy_signed_on(PurpleBuddy *buddy, FinchBlist *ggblist)
-{
-	add_node((PurpleBlistNode*)buddy, ggblist);
-}
-
-static void
-buddy_signed_off(PurpleBuddy *buddy, FinchBlist *ggblist)
-{
-	node_remove(purple_blist_get_buddy_list(), (PurpleBlistNode*)buddy);
-}
-#endif
-
 PurpleBlistUiOps *finch_blist_get_ui_ops()
 {
 	return &blist_ui_ops;
@@ -1171,6 +1101,11 @@ create_chat_menu(GntMenu *menu, PurpleChat *chat)
 	g_signal_connect_swapped(G_OBJECT(menu), "destroy",
 			G_CALLBACK(purple_menu_action_free), action);
 
+	/* Protocol actions */
+	append_proto_menu(menu,
+			purple_account_get_connection(purple_chat_get_account(chat)),
+			(PurpleBlistNode*)chat);
+
 	add_custom_action(menu, _("Edit Settings"), (PurpleCallback)chat_components_edit, chat);
 }
 
@@ -1279,12 +1214,16 @@ create_buddy_menu(GntMenu *menu, PurpleBuddy *buddy)
 	add_custom_action(menu, _("Add Buddy Pounce"),
 			PURPLE_CALLBACK(finch_blist_pounce_node_cb), buddy);
 
-	if (protocol && PURPLE_PROTOCOL_IMPLEMENTS(protocol, XFER_IFACE, send))
+	if (PURPLE_IS_PROTOCOL_XFER(protocol))
 	{
-		if (!PURPLE_PROTOCOL_IMPLEMENTS(protocol, XFER_IFACE, can_receive) ||
-			purple_protocol_xfer_iface_can_receive(protocol, gc, purple_buddy_get_name(buddy)))
+		if (purple_protocol_xfer_can_receive(
+			PURPLE_PROTOCOL_XFER(protocol),
+			gc,
+			purple_buddy_get_name(buddy))
+		) {
 			add_custom_action(menu, _("Send File"),
 					PURPLE_CALLBACK(finch_blist_menu_send_file_cb), buddy);
+		}
 	}
 
 	account = purple_buddy_get_account(buddy);
@@ -1875,16 +1814,16 @@ key_pressed(GntWidget *widget, const char *text, FinchBlist *ggblist)
 		if (gnt_tree_is_searching(GNT_TREE(ggblist->tree)))
 			gnt_bindable_perform_action_named(GNT_BINDABLE(ggblist->tree), "end-search", NULL);
 		remove_peripherals(ggblist);
-	} else if (strcmp(text, GNT_KEY_INS) == 0) {
+	} else if (purple_strequal(text, GNT_KEY_INS)) {
 		PurpleBlistNode *node = gnt_tree_get_selection_data(GNT_TREE(ggblist->tree));
 		purple_blist_request_add_buddy(NULL, NULL,
 				node && PURPLE_IS_GROUP(node) ? purple_group_get_name(PURPLE_GROUP(node)) : NULL,
 				NULL);
 	} else if (!gnt_tree_is_searching(GNT_TREE(ggblist->tree))) {
-		if (strcmp(text, "t") == 0) {
+		if (purple_strequal(text, "t")) {
 			finch_blist_toggle_tag_buddy(gnt_tree_get_selection_data(GNT_TREE(ggblist->tree)));
 			gnt_bindable_perform_action_named(GNT_BINDABLE(ggblist->tree), "move-down", NULL);
-		} else if (strcmp(text, "a") == 0) {
+		} else if (purple_strequal(text, "a")) {
 			finch_blist_place_tagged(gnt_tree_get_selection_data(GNT_TREE(ggblist->tree)));
 		} else
 			return FALSE;
@@ -1970,13 +1909,13 @@ reset_blist_window(GntWidget *window, gpointer null)
 	}
 
 	if (ggblist->typing)
-		purple_timeout_remove(ggblist->typing);
+		g_source_remove(ggblist->typing);
 	remove_peripherals(ggblist);
 	if (ggblist->tagged)
 		g_list_free(ggblist->tagged);
 
 	if (ggblist->new_group_timeout)
-		purple_timeout_remove(ggblist->new_group_timeout);
+		g_source_remove(ggblist->new_group_timeout);
 	if (ggblist->new_group)
 		g_list_free(ggblist->new_group);
 
@@ -1993,13 +1932,13 @@ populate_buddylist(void)
 	if (ggblist->manager->init)
 		ggblist->manager->init();
 
-	if (strcmp(purple_prefs_get_string(PREF_ROOT "/sort_type"), "text") == 0) {
+	if (purple_strequal(purple_prefs_get_string(PREF_ROOT "/sort_type"), "text")) {
 		gnt_tree_set_compare_func(GNT_TREE(ggblist->tree),
 			(GCompareFunc)blist_node_compare_text);
-	} else if (strcmp(purple_prefs_get_string(PREF_ROOT "/sort_type"), "status") == 0) {
+	} else if (purple_strequal(purple_prefs_get_string(PREF_ROOT "/sort_type"), "status")) {
 		gnt_tree_set_compare_func(GNT_TREE(ggblist->tree),
 			(GCompareFunc)blist_node_compare_status);
-	} else if (strcmp(purple_prefs_get_string(PREF_ROOT "/sort_type"), "log") == 0) {
+	} else if (purple_strequal(purple_prefs_get_string(PREF_ROOT "/sort_type"), "log")) {
 		gnt_tree_set_compare_func(GNT_TREE(ggblist->tree),
 			(GCompareFunc)blist_node_compare_log);
 	}
@@ -2209,7 +2148,7 @@ remove_typing_cb(gpointer null)
 end:
 	g_free(escnewmessage);
 	if (ggblist->typing)
-		purple_timeout_remove(ggblist->typing);
+		g_source_remove(ggblist->typing);
 	ggblist->typing = 0;
 	return FALSE;
 }
@@ -2228,7 +2167,7 @@ status_selection_changed(GntComboBox *box, StatusBoxItem *old, StatusBoxItem *no
 		/* Move the focus to the entry box */
 		/* XXX: Make sure the selected status can have a message */
 		gnt_box_move_focus(GNT_BOX(ggblist->window), 1);
-		ggblist->typing = purple_timeout_add_seconds(TYPING_TIMEOUT_S, (GSourceFunc)remove_typing_cb, NULL);
+		ggblist->typing = g_timeout_add_seconds(TYPING_TIMEOUT_S, (GSourceFunc)remove_typing_cb, NULL);
 	}
 	else if (now->type == STATUS_SAVED_ALL)
 	{
@@ -2254,7 +2193,7 @@ status_text_changed(GntEntry *entry, const char *text, gpointer null)
 		return FALSE;
 
 	if (ggblist->typing)
-		purple_timeout_remove(ggblist->typing);
+		g_source_remove(ggblist->typing);
 	ggblist->typing = 0;
 
 	if (text[0] == '\r' && text[1] == 0)
@@ -2264,7 +2203,7 @@ status_text_changed(GntEntry *entry, const char *text, gpointer null)
 		return TRUE;
 	}
 
-	ggblist->typing = purple_timeout_add_seconds(TYPING_TIMEOUT_S, (GSourceFunc)remove_typing_cb, NULL);
+	ggblist->typing = g_timeout_add_seconds(TYPING_TIMEOUT_S, (GSourceFunc)remove_typing_cb, NULL);
 	return FALSE;
 }
 
@@ -2506,7 +2445,7 @@ buddy_recent_signed_on_off(gpointer data)
 	PurpleBlistNode *node = data;
 	FinchBlistNode *fnode = purple_blist_node_get_ui_data(node);
 
-	purple_timeout_remove(fnode->signed_timer);
+	g_source_remove(fnode->signed_timer);
 	fnode->signed_timer = 0;
 
 	if (!ggblist->manager->can_add_node(node)) {
@@ -2530,10 +2469,10 @@ buddy_signed_on_off_cb(gpointer data)
 		return FALSE;
 
 	if (fnode->signed_timer)
-		purple_timeout_remove(fnode->signed_timer);
+		g_source_remove(fnode->signed_timer);
 
 	g_object_ref(node);
-	fnode->signed_timer = purple_timeout_add_seconds(6, (GSourceFunc)buddy_recent_signed_on_off, data);
+	fnode->signed_timer = g_timeout_add_seconds(6, (GSourceFunc)buddy_recent_signed_on_off, data);
 	update_node_display(node, ggblist);
 	if (purple_blist_node_get_parent(node) && PURPLE_IS_CONTACT(purple_blist_node_get_parent(node)))
 		update_node_display(purple_blist_node_get_parent(node), ggblist);
@@ -3122,17 +3061,6 @@ blist_show(PurpleBuddyList *list)
 	purple_signal_connect(purple_blist_get_handle(), "buddy-signed-off", finch_blist_get_handle(),
 				PURPLE_CALLBACK(buddy_signed_on_off), ggblist);
 
-#if 0
-	/* These I plan to use to indicate unread-messages etc. */
-	purple_signal_connect(purple_conversations_get_handle(), "received-im-msg", finch_blist_get_handle(),
-				PURPLE_CALLBACK(received_im_msg), list);
-	purple_signal_connect(purple_conversations_get_handle(), "sent-im-msg", finch_blist_get_handle(),
-				PURPLE_CALLBACK(sent_im_msg), NULL);
-
-	purple_signal_connect(purple_conversations_get_handle(), "received-chat-msg", finch_blist_get_handle(),
-				PURPLE_CALLBACK(received_chat_msg), list);
-#endif
-
 	g_signal_connect(G_OBJECT(ggblist->tree), "selection_changed", G_CALLBACK(selection_changed), ggblist);
 	g_signal_connect(G_OBJECT(ggblist->tree), "key_pressed", G_CALLBACK(key_pressed), ggblist);
 	g_signal_connect(G_OBJECT(ggblist->tree), "context-menu", G_CALLBACK(context_menu), ggblist);
@@ -3198,7 +3126,7 @@ void finch_blist_install_manager(const FinchBlistManager *manager)
 	if (!g_list_find(managers, manager)) {
 		managers = g_list_append(managers, (gpointer)manager);
 		reconstruct_grouping_menu();
-		if (strcmp(manager->id, purple_prefs_get_string(PREF_ROOT "/grouping")) == 0)
+		if (purple_strequal(manager->id, purple_prefs_get_string(PREF_ROOT "/grouping")))
 			purple_prefs_trigger_callback(PREF_ROOT "/grouping");
 	}
 }
@@ -3208,7 +3136,7 @@ void finch_blist_uninstall_manager(const FinchBlistManager *manager)
 	if (g_list_find(managers, manager)) {
 		managers = g_list_remove(managers, manager);
 		reconstruct_grouping_menu();
-		if (strcmp(manager->id, purple_prefs_get_string(PREF_ROOT "/grouping")) == 0)
+		if (purple_strequal(manager->id, purple_prefs_get_string(PREF_ROOT "/grouping")))
 			purple_prefs_trigger_callback(PREF_ROOT "/grouping");
 	}
 }
@@ -3221,7 +3149,7 @@ FinchBlistManager * finch_blist_manager_find(const char *id)
 
 	for (; iter; iter = iter->next) {
 		FinchBlistManager *m = iter->data;
-		if (strcmp(id, m->id) == 0)
+		if (purple_strequal(id, m->id))
 			return m;
 	}
 	return NULL;

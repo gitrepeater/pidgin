@@ -28,7 +28,6 @@
 #include "gntentry.h"
 #include "gntfilesel.h"
 #include "gntlabel.h"
-#include "gntmarshal.h"
 #include "gntstyle.h"
 #include "gnttree.h"
 
@@ -38,10 +37,6 @@
 #include <unistd.h>
 
 #include <glib/gstdio.h>
-
-#if 0
-#include <glob.h>
-#endif
 
 enum
 {
@@ -282,12 +277,7 @@ location_key_pressed(GntTree *tree, const char *key, GntFileSel *sel)
 {
 	char *path;
 	char *str;
-#if 0
-	int count;
-	glob_t gl;
-	GStatBuf st;
-	int glob_ret;
-#endif
+
 	if (strcmp(key, "\r") && strcmp(key, "\n"))
 		return FALSE;
 
@@ -310,39 +300,9 @@ location_key_pressed(GntTree *tree, const char *key, GntFileSel *sel)
 		g_free(path);
 		return FALSE;
 	}
-#if 0
-	/* XXX: there needs to be a way to allow other methods for globbing,
-	 * like the read_fn stuff. */
-	glob_ret = glob(path, GLOB_MARK, NULL, &gl);
-	if (!glob_ret) {  /* XXX: do something with the return value */
-		char *loc = g_path_get_dirname(gl.gl_pathv[0]);
 
-		g_stat(gl.gl_pathv[0], &st);
-		gnt_file_sel_set_current_location(sel, loc);  /* XXX: check the return value */
-		g_free(loc);
-		if (!S_ISDIR(st.st_mode) && !sel->dirsonly) {
-			gnt_tree_remove_all(GNT_TREE(sel->files));
-			for (count = 0; count < gl.gl_pathc; count++) {
-				char *tmp = process_path(gl.gl_pathv[count]);
-				loc = g_path_get_dirname(tmp);
-				if (g_utf8_collate(sel->current, loc) == 0) {
-					char *base = g_path_get_basename(tmp);
-					char size[128];
-					snprintf(size, sizeof(size), "%ld", (long)st.st_size);
-					gnt_tree_add_row_after(GNT_TREE(sel->files), base,
-							gnt_tree_create_row(GNT_TREE(sel->files), base, size, ""), NULL, NULL);
-				}
-				g_free(loc);
-				g_free(tmp);
-			}
-			gnt_widget_draw(sel->files);
-		}
-	} else if (sel->files) {
-		gnt_tree_remove_all(GNT_TREE(sel->files));
-		gnt_widget_draw(sel->files);
-	}
-	globfree(&gl);
-#endif
+	/* XXX: Add support for globbing via g_pattern_spec_* */
+
 success:
 	g_free(path);
 	return TRUE;
@@ -506,8 +466,7 @@ gnt_file_sel_class_init(GntFileSelClass *klass)
 					 G_TYPE_FROM_CLASS(klass),
 					 G_SIGNAL_RUN_LAST,
 					 G_STRUCT_OFFSET(GntFileSelClass, file_selected),
-					 NULL, NULL,
-					 gnt_closure_marshal_VOID__STRING_STRING,
+					 NULL, NULL, NULL,
 					 G_TYPE_NONE, 2, G_TYPE_STRING, G_TYPE_STRING);
 
 	gnt_bindable_class_register_action(bindable, "toggle-tag", toggle_tag_selection, "t", NULL);

@@ -10,6 +10,7 @@
  */
 
 #include "internal.h"
+#include "util.h"
 
 static Code_t Z_RetSubs(ZNotice_t *notice, int *nsubs, Z_AuthProc auth_routine);
 
@@ -40,22 +41,6 @@ Code_t ZRetrieveSubscriptions(port,nsubs)
 
 	return(Z_RetSubs(&notice, nsubs, ZAUTH));
 }
-
-#if 0
-Code_t ZRetrieveDefaultSubscriptions(nsubs)
-	int *nsubs;
-{
-	ZNotice_t notice;
-
-	(void) memset((char *)&notice, 0, sizeof(notice));
-	notice.z_message = (char *) 0;
-	notice.z_message_len = 0;
-	notice.z_opcode = CLIENT_GIMMEDEFS;
-
-	return(Z_RetSubs(&notice, nsubs, ZNOAUTH));
-
-}
-#endif
 
 static Code_t Z_RetSubs(notice, nsubs, auth_routine)
 	register ZNotice_t *notice;
@@ -105,12 +90,12 @@ static Code_t Z_RetSubs(notice, nsubs, auth_routine)
 		}
 		/* non-matching protocol version numbers means the
 		   server is probably an older version--must punt */
-		if (strcmp(notice->z_version,retnotice.z_version)) {
+		if (!purple_strequal(notice->z_version,retnotice.z_version)) {
 			ZFreeNotice(&retnotice);
 			return(ZERR_VERS);
 		}
 		if (retnotice.z_kind == SERVACK &&
-		    !strcmp(retnotice.z_opcode,notice->z_opcode)) {
+		    purple_strequal(retnotice.z_opcode,notice->z_opcode)) {
 			ZFreeNotice(&retnotice);
 			gimmeack = 1;
 			continue;

@@ -63,14 +63,6 @@ struct stun_attrib {
 	guint16 len;
 };
 
-#if 0
-struct stun_change {
-	struct stun_header hdr;
-	struct stun_attrib attrib;
-	char value[4];
-};
-#endif	/* 0 */
-
 struct stun_conn {
 	int fd;
 	struct sockaddr_in addr;
@@ -100,7 +92,7 @@ static void close_stun_conn(struct stun_conn *sc) {
 		purple_input_remove(sc->incb);
 
 	if (sc->timeout)
-		purple_timeout_remove(sc->timeout);
+		g_source_remove(sc->timeout);
 
 	if (sc->fd)
 		close(sc->fd);
@@ -149,27 +141,6 @@ static gboolean timeoutfunc(gpointer data) {
 	}
 	return TRUE;
 }
-
-#if 0
-static void do_test2(struct stun_conn *sc) {
-	struct stun_change data;
-	data.hdr.type = htons(0x0001);
-	data.hdr.len = 0;
-	data.hdr.transid[0] = rand();
-	data.hdr.transid[1] = ntohl(((int)'g' << 24) + ((int)'a' << 16) + ((int)'i' << 8) + (int)'m');
-	data.hdr.transid[2] = rand();
-	data.hdr.transid[3] = rand();
-	data.attrib.type = htons(0x003);
-	data.attrib.len = htons(4);
-	data.value[3] = 6;
-	sc->packet = (struct stun_header*)&data;
-	sc->packetsize = sizeof(struct stun_change);
-	sc->retry = 0;
-	sc->test = 2;
-	sendto(sc->fd, sc->packet, sc->packetsize, 0, (struct sockaddr *)&(sc->addr), sizeof(struct sockaddr_in));
-	sc->timeout = purple_timeout_add(500, (GSourceFunc) timeoutfunc, sc);
-}
-#endif	/* 0 */
 
 static void reply_cb(gpointer data, gint source, PurpleInputCondition cond) {
 	struct stun_conn *sc = data;
@@ -254,7 +225,7 @@ static void reply_cb(gpointer data, gint source, PurpleInputCondition cond) {
 		ifc.ifc_req = buffer_ifr;
 		ioctl(source, SIOCGIFCONF, &ifc);
 
-		it = buffer;
+		it = (guchar *)buffer_ifr;
 		it_end = it + ifc.ifc_len;
 		while (it < it_end) {
 			ifr = (struct ifreq*)(gpointer)it;
@@ -275,7 +246,7 @@ static void reply_cb(gpointer data, gint source, PurpleInputCondition cond) {
 		close_stun_conn(sc);
 		do_callbacks();
 #else
-		purple_timeout_remove(sc->timeout);
+		g_source_remove(sc->timeout);
 		sc->timeout = 0;
 
 		do_test2(sc);
@@ -312,7 +283,7 @@ hbn_listen_cb(int fd, gpointer data) {
 
 	sc->incb = purple_input_add(fd, PURPLE_INPUT_READ, reply_cb, sc);
 
-	address = G_INET_ADDRESS(ld->addresses->data);
+	address = g_object_ref(G_INET_ADDRESS(ld->addresses->data));
 	socket_address = g_inet_socket_address_new(address, ld->port);
 
 	g_socket_address_to_native(socket_address, &(sc->addr), g_socket_address_get_native_size(socket_address), NULL);
@@ -324,10 +295,10 @@ hbn_listen_cb(int fd, gpointer data) {
 
 	hdr_data.type = htons(MSGTYPE_BINDINGREQUEST);
 	hdr_data.len = 0;
-	hdr_data.transid[0] = rand();
+	hdr_data.transid[0] = g_random_int();
 	hdr_data.transid[1] = ntohl(((int)'g' << 24) + ((int)'a' << 16) + ((int)'i' << 8) + (int)'m');
-	hdr_data.transid[2] = rand();
-	hdr_data.transid[3] = rand();
+	hdr_data.transid[2] = g_random_int();
+	hdr_data.transid[3] = g_random_int();
 
 	if(sendto(sc->fd, &hdr_data, sizeof(struct stun_header), 0,
 			(struct sockaddr *)&(sc->addr),
@@ -341,7 +312,7 @@ hbn_listen_cb(int fd, gpointer data) {
 	sc->test = 1;
 	sc->packet = &hdr_data;
 	sc->packetsize = sizeof(struct stun_header);
-	sc->timeout = purple_timeout_add(500, (GSourceFunc) timeoutfunc, sc);
+	sc->timeout = g_timeout_add(500, (GSourceFunc) timeoutfunc, sc);
 }
 
 static void
@@ -442,7 +413,7 @@ PurpleStunNatDiscovery *purple_stun_discover(PurpleStunCallback cb) {
 
 		if (use_cached_result) {
 			if(cb)
-				purple_timeout_add(10, call_callback, cb);
+				g_timeout_add(10, call_callback, cb);
 			return &nattype;
 		}
 	}
@@ -451,7 +422,7 @@ PurpleStunNatDiscovery *purple_stun_discover(PurpleStunCallback cb) {
 		nattype.status = PURPLE_STUN_STATUS_UNKNOWN;
 		nattype.lookup_time = time(NULL);
 		if(cb)
-			purple_timeout_add(10, call_callback, cb);
+			g_timeout_add(10, call_callback, cb);
 		return &nattype;
 	}
 

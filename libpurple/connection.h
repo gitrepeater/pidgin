@@ -29,6 +29,8 @@
  * @see_also: <link linkend="chapter-signals-connection">Connection signals</link>
  */
 
+#include <glib.h>
+
 #define PURPLE_TYPE_CONNECTION             (purple_connection_get_type())
 #define PURPLE_CONNECTION(obj)             (G_TYPE_CHECK_INSTANCE_CAST((obj), PURPLE_TYPE_CONNECTION, PurpleConnection))
 #define PURPLE_CONNECTION_CLASS(klass)     (G_TYPE_CHECK_CLASS_CAST((klass), PURPLE_TYPE_CONNECTION, PurpleConnectionClass))
@@ -98,6 +100,16 @@ typedef enum
 	PURPLE_CONNECTION_CONNECTED,
 	PURPLE_CONNECTION_CONNECTING
 } PurpleConnectionState;
+
+#define PURPLE_CONNECTION_ERROR purple_connection_error_quark()
+
+/**
+ * purple_connection_error_quark:
+ *
+ * Error domain for Purple connection errors. Errors in this domain will be
+ * from the #PurpleConnectionError enum.
+ */
+GQuark purple_connection_error_quark(void);
 
 /**
  * PurpleConnectionError:
@@ -393,7 +405,7 @@ purple_connection_is_disconnecting(const PurpleConnection *gc);
  *
  * Returns the connection's account.
  *
- * Returns: The connection's account.
+ * Returns: (transfer none): The connection's account.
  */
 PurpleAccount *purple_connection_get_account(const PurpleConnection *gc);
 
@@ -403,7 +415,7 @@ PurpleAccount *purple_connection_get_account(const PurpleConnection *gc);
  *
  * Returns the protocol managing a connection.
  *
- * Returns: The protocol.
+ * Returns: (transfer none): The protocol.
  */
 PurpleProtocol *purple_connection_get_protocol(const PurpleConnection *gc);
 
@@ -423,7 +435,8 @@ const char *purple_connection_get_password(const PurpleConnection *gc);
  *
  * Returns a list of active chat conversations on a connection.
  *
- * Returns: The active chats on the connection.
+ * Returns: (element-type PurpleChatConversation) (transfer none): The active
+ *          chats on the connection.
  */
 GSList *purple_connection_get_active_chats(const PurpleConnection *gc);
 
@@ -510,8 +523,6 @@ purple_connection_ssl_error (PurpleConnection *gc,
  * purple_connection_g_error
  * @gc: Connection the error is associated with
  * @error: Error information
- * @description: Extra string which further explains the error.
- *               Substitutes a "%s" with the GError message.
  *
  * Closes a connection similar to purple_connection_error(), but
  * takes a GError which is then converted to purple error codes.
@@ -524,8 +535,22 @@ purple_connection_ssl_error (PurpleConnection *gc,
  */
 void
 purple_connection_g_error(PurpleConnection *pc,
-                          const GError *error,
-                          const gchar *description);
+                          const GError *error);
+
+/*
+ * purple_connection_take_error
+ * @gc: Connection the error is associated with
+ * @error: (transfer full): Error information
+ *
+ * Closes a connection similar to purple_connection_error(), but
+ * takes a GError which is then converted to purple error codes.
+ *
+ * This function is equivalent to purple_connection_g_error(),
+ * except that it takes ownership of the GError.
+ */
+void
+purple_connection_take_error(PurpleConnection *pc,
+                             GError *error);
 
 /**
  * purple_connection_error_is_fatal:
@@ -574,7 +599,8 @@ void purple_connections_disconnect_all(void);
  * Returns a list of all active connections.  This does not
  * include connections that are in the process of connecting.
  *
- * Returns: (transfer none): A list of all active connections.
+ * Returns: (element-type PurpleConnection) (transfer none): A list of all
+ *          active connections.
  */
 GList *purple_connections_get_all(void);
 
@@ -583,7 +609,8 @@ GList *purple_connections_get_all(void);
  *
  * Returns a list of all connections in the process of connecting.
  *
- * Returns: (transfer none): A list of connecting connections.
+ * Returns: (element-type PurpleConnection) (transfer none): A list of
+ *          connecting connections.
  */
 GList *purple_connections_get_connecting(void);
 

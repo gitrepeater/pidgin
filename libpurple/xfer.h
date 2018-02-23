@@ -38,6 +38,11 @@
 
 #define PURPLE_TYPE_XFER_UI_OPS      (purple_xfer_ui_ops_get_type())
 
+#define PURPLE_TYPE_PROTOCOL_XFER           (purple_protocol_xfer_get_type())
+#define PURPLE_PROTOCOL_XFER(obj)           (G_TYPE_CHECK_INSTANCE_CAST((obj), PURPLE_TYPE_PROTOCOL_XFER, PurpleProtocolXfer))
+#define PURPLE_IS_PROTOCOL_XFER(obj)        (G_TYPE_CHECK_INSTANCE_TYPE((obj), PURPLE_TYPE_PROTOCOL_XFER))
+#define PURPLE_PROTOCOL_XFER_GET_IFACE(obj) (G_TYPE_INSTANCE_GET_INTERFACE((obj), PURPLE_TYPE_PROTOCOL_XFER, PurpleProtocolXferInterface))
+
 /**************************************************************************/
 /** Data Structures                                                       */
 /**************************************************************************/
@@ -46,10 +51,14 @@ typedef struct _PurpleXferClass PurpleXferClass;
 
 typedef struct _PurpleXferUiOps PurpleXferUiOps;
 
+typedef struct _PurpleProtocolXfer PurpleProtocolXfer;
+typedef struct _PurpleProtocolXferInterface PurpleProtocolXferInterface;
+
 #include <glib.h>
 #include <stdio.h>
 
 #include "account.h"
+#include "connection.h"
 
 /**
  * PurpleXferType:
@@ -72,7 +81,7 @@ typedef enum
  * @PURPLE_XFER_STATUS_UNKNOWN:       Unknown, the xfer may be null.
  * @PURPLE_XFER_STATUS_NOT_STARTED:   It hasn't started yet.
  * @PURPLE_XFER_STATUS_ACCEPTED:      Receive accepted, but destination file
- *                                    not selected yet
+ *                                    not selected yet.
  * @PURPLE_XFER_STATUS_STARTED:       purple_xfer_start has been called.
  * @PURPLE_XFER_STATUS_DONE:          The xfer completed successfully.
  * @PURPLE_XFER_STATUS_CANCEL_LOCAL:  The xfer was cancelled by us.
@@ -94,6 +103,15 @@ typedef enum
 
 /**
  * PurpleXferUiOps:
+ * @new_xfer: UI op that's called after a new transfer is created.
+ * @destroy: UI op that's called when a transfer is being destroyed.
+ * @add_xfer: UI op that's called when a transfer should be added to the UI.
+ * @update_progress: UI op that's called when a transfer's progress has been
+ *                   updated.
+ * @cancel_local: UI op that's called when a transfer has been cancelled on the
+ *                local end.
+ * @cancel_remote: UI op that's called when a transfer has been cancelled on
+ *                 the remote end.
  * @ui_write: UI op to write data received from the protocol. The UI must deal
  *            with the entire buffer and return size, or it is treated as an
  *            error.
@@ -171,6 +189,26 @@ struct _PurpleXferClass
 	void (*_purple_reserved2)(void);
 	void (*_purple_reserved3)(void);
 	void (*_purple_reserved4)(void);
+};
+
+/**
+ * PurpleProtocolXferInterface:
+ *
+ * The protocol file transfer interface.
+ *
+ * This interface provides file transfer callbacks for the protocol.
+ */
+struct _PurpleProtocolXferInterface
+{
+	/*< private >*/
+	GTypeInterface parent_iface;
+
+	/*< public >*/
+	gboolean (*can_receive)(PurpleProtocolXfer *prplxfer, PurpleConnection *c, const gchar *who);
+
+	void (*send)(PurpleProtocolXfer *prplxfer, PurpleConnection *c, const gchar *who, const gchar *filename);
+
+	PurpleXfer *(*new_xfer)(PurpleProtocolXfer *prplxfer, PurpleConnection *c, const gchar *who);
 };
 
 G_BEGIN_DECLS
@@ -936,6 +974,52 @@ void purple_xfers_set_ui_ops(PurpleXferUiOps *ops);
  * Returns: The UI operations structure.
  */
 PurpleXferUiOps *purple_xfers_get_ui_ops(void);
+
+/******************************************************************************
+ * Protocol Interface
+ *****************************************************************************/
+
+/**
+ * purple_protocol_xfer_get_type:
+ *
+ * Returns: The #GType for the protocol xfer interface.
+ */
+GType purple_protocol_xfer_get_type(void);
+
+/**
+ * purple_protocol_xfer_can_receive:
+ * @prplxfer: The #PurpleProtocolXfer implementer instance
+ * @connection: The #PurpleConnection that we're checking
+ * @who: The user that we want to send a file transfer to.
+ *
+ * Checks whether or not we can transfer a file to @who.
+ *
+ * Returns: TRUE on success, FALSE otherwise.
+ */
+gboolean purple_protocol_xfer_can_receive(PurpleProtocolXfer *prplxfer, PurpleConnection *connection, const gchar *who);
+
+/**
+ * purple_protocol_xfer_send:
+ * @prplxfer: The #PurpleProtocolXfer implementer instance
+ * @connection: The #PurpleConnection that we're checking
+ * @who: The user that we want to set a file transfer to.
+ * @filename: The name of the file to send.
+ *
+ * Sends @filename to @who.
+ */
+void purple_protocol_xfer_send(PurpleProtocolXfer *prplxfer, PurpleConnection *connection, const gchar *who, const gchar *filename);
+
+/**
+ * purple_protocol_xfer_send:
+ * @prplxfer: The #PurpleProtocolXfer implementer instance
+ * @connection: The #PurpleConnection that we're checking
+ * @who: The user that we want to send a file transfer to.
+ *
+ * Creates a new #PurpleXfer to @who.
+ *
+ * Returns: A new #PurpleXfer instance.
+ */
+PurpleXfer *purple_protocol_xfer_new_xfer(PurpleProtocolXfer *prplxfer, PurpleConnection *connection, const gchar *who);
 
 G_END_DECLS
 

@@ -50,7 +50,6 @@
 
 #include "gntwm.h"
 #include "gntstyle.h"
-#include "gntmarshal.h"
 #include "gnt.h"
 #include "gntbox.h"
 #include "gntbutton.h"
@@ -167,37 +166,37 @@ work_around_for_ncurses_bug(void)
 		cchar_t ch;
 		PANEL *below = panel;
 
-		sx = panel->win->_begx;
-		ex = panel->win->_maxx + sx;
-		sy = panel->win->_begy;
-		ey = panel->win->_maxy + sy;
+		sx = getbegx(panel->win);
+		ex = getmaxx(panel->win) + sx;
+		sy = getbegy(panel->win);
+		ey = getmaxy(panel->win) + sy;
 
 		while ((below = panel_below(below)) != NULL) {
-			if (sy > below->win->_begy + below->win->_maxy ||
-					ey < below->win->_begy)
+			if (sy > getbegy(below->win) + getmaxy(below->win) ||
+					ey < getbegy(below->win))
 				continue;
-			if (sx > below->win->_begx + below->win->_maxx ||
-					ex < below->win->_begx)
+			if (sx > getbegx(below->win) + getmaxx(below->win) ||
+					ex < getbegx(below->win))
 				continue;
-			for (y = MAX(sy, below->win->_begy); y <= MIN(ey, below->win->_begy + below->win->_maxy); y++) {
-				if (mvwin_wch(below->win, y - below->win->_begy, sx - 1 - below->win->_begx, &ch) != OK)
+			for (y = MAX(sy, getbegy(below->win)); y <= MIN(ey, getbegy(below->win) + getmaxy(below->win)); y++) {
+				if (mvwin_wch(below->win, y - getbegy(below->win), sx - 1 - getbegx(below->win), &ch) != OK)
 					goto right;
 				w = widestringwidth(ch.chars);
 				if (w > 1 && (ch.attr & 1)) {
 					ch.chars[0] = ' ';
 					ch.attr &= ~ A_CHARTEXT;
-					mvwadd_wch(below->win, y - below->win->_begy, sx - 1 - below->win->_begx, &ch);
-					touchline(below->win, y - below->win->_begy, 1);
+					mvwadd_wch(below->win, y - getbegy(below->win), sx - 1 - getbegx(below->win), &ch);
+					touchline(below->win, y - getbegy(below->win), 1);
 				}
 right:
-				if (mvwin_wch(below->win, y - below->win->_begy, ex + 1 - below->win->_begx, &ch) != OK)
+				if (mvwin_wch(below->win, y - getbegy(below->win), ex + 1 - getbegx(below->win), &ch) != OK)
 					continue;
 				w = widestringwidth(ch.chars);
 				if (w > 1 && !(ch.attr & 1)) {
 					ch.chars[0] = ' ';
 					ch.attr &= ~ A_CHARTEXT;
-					mvwadd_wch(below->win, y - below->win->_begy, ex + 1 - below->win->_begx, &ch);
-					touchline(below->win, y - below->win->_begy, 1);
+					mvwadd_wch(below->win, y - getbegy(below->win), ex + 1 - getbegx(below->win), &ch);
+					touchline(below->win, y - getbegy(below->win), 1);
 				}
 			}
 		}
@@ -1421,32 +1420,28 @@ gnt_wm_class_init(GntWMClass *klass)
 					 G_TYPE_FROM_CLASS(klass),
 					 G_SIGNAL_RUN_LAST,
 					 G_STRUCT_OFFSET(GntWMClass, new_window),
-					 NULL, NULL,
-					 g_cclosure_marshal_VOID__POINTER,
+					 NULL, NULL, NULL,
 					 G_TYPE_NONE, 1, G_TYPE_POINTER);
 	signals[SIG_DECORATE_WIN] =
 		g_signal_new("decorate_win",
 					 G_TYPE_FROM_CLASS(klass),
 					 G_SIGNAL_RUN_LAST,
 					 G_STRUCT_OFFSET(GntWMClass, decorate_window),
-					 NULL, NULL,
-					 g_cclosure_marshal_VOID__POINTER,
+					 NULL, NULL, NULL,
 					 G_TYPE_NONE, 1, G_TYPE_POINTER);
 	signals[SIG_CLOSE_WIN] =
 		g_signal_new("close_win",
 					 G_TYPE_FROM_CLASS(klass),
 					 G_SIGNAL_RUN_LAST,
 					 G_STRUCT_OFFSET(GntWMClass, close_window),
-					 NULL, NULL,
-					 g_cclosure_marshal_VOID__POINTER,
+					 NULL, NULL, NULL,
 					 G_TYPE_NONE, 1, G_TYPE_POINTER);
 	signals[SIG_CONFIRM_RESIZE] =
 		g_signal_new("confirm_resize",
 					 G_TYPE_FROM_CLASS(klass),
 					 G_SIGNAL_RUN_LAST,
 					 G_STRUCT_OFFSET(GntWMClass, window_resize_confirm),
-					 gnt_boolean_handled_accumulator, NULL,
-					 gnt_closure_marshal_BOOLEAN__POINTER_POINTER_POINTER,
+					 gnt_boolean_handled_accumulator, NULL, NULL,
 					 G_TYPE_BOOLEAN, 3, G_TYPE_POINTER, G_TYPE_POINTER, G_TYPE_POINTER);
 
 	signals[SIG_CONFIRM_MOVE] =
@@ -1454,8 +1449,7 @@ gnt_wm_class_init(GntWMClass *klass)
 					 G_TYPE_FROM_CLASS(klass),
 					 G_SIGNAL_RUN_LAST,
 					 G_STRUCT_OFFSET(GntWMClass, window_move_confirm),
-					 gnt_boolean_handled_accumulator, NULL,
-					 gnt_closure_marshal_BOOLEAN__POINTER_POINTER_POINTER,
+					 gnt_boolean_handled_accumulator, NULL, NULL,
 					 G_TYPE_BOOLEAN, 3, G_TYPE_POINTER, G_TYPE_POINTER, G_TYPE_POINTER);
 
 	signals[SIG_RESIZED] =
@@ -1463,24 +1457,21 @@ gnt_wm_class_init(GntWMClass *klass)
 					 G_TYPE_FROM_CLASS(klass),
 					 G_SIGNAL_RUN_LAST,
 					 G_STRUCT_OFFSET(GntWMClass, window_resized),
-					 NULL, NULL,
-					 g_cclosure_marshal_VOID__POINTER,
+					 NULL, NULL, NULL,
 					 G_TYPE_NONE, 1, G_TYPE_POINTER);
 	signals[SIG_MOVED] =
 		g_signal_new("window_moved",
 					 G_TYPE_FROM_CLASS(klass),
 					 G_SIGNAL_RUN_LAST,
 					 G_STRUCT_OFFSET(GntWMClass, window_moved),
-					 NULL, NULL,
-					 g_cclosure_marshal_VOID__POINTER,
+					 NULL, NULL, NULL,
 					 G_TYPE_NONE, 1, G_TYPE_POINTER);
 	signals[SIG_UPDATE_WIN] =
 		g_signal_new("window_update",
 					 G_TYPE_FROM_CLASS(klass),
 					 G_SIGNAL_RUN_LAST,
 					 G_STRUCT_OFFSET(GntWMClass, window_update),
-					 NULL, NULL,
-					 g_cclosure_marshal_VOID__POINTER,
+					 NULL, NULL, NULL,
 					 G_TYPE_NONE, 1, G_TYPE_POINTER);
 
 	signals[SIG_GIVE_FOCUS] =
@@ -1488,8 +1479,7 @@ gnt_wm_class_init(GntWMClass *klass)
 					 G_TYPE_FROM_CLASS(klass),
 					 G_SIGNAL_RUN_LAST,
 					 G_STRUCT_OFFSET(GntWMClass, give_focus),
-					 NULL, NULL,
-					 g_cclosure_marshal_VOID__POINTER,
+					 NULL, NULL, NULL,
 					 G_TYPE_NONE, 1, G_TYPE_POINTER);
 
 	signals[SIG_MOUSE_CLICK] =
@@ -1497,8 +1487,7 @@ gnt_wm_class_init(GntWMClass *klass)
 					 G_TYPE_FROM_CLASS(klass),
 					 G_SIGNAL_RUN_LAST,
 					 G_STRUCT_OFFSET(GntWMClass, mouse_clicked),
-					 gnt_boolean_handled_accumulator, NULL,
-					 gnt_closure_marshal_BOOLEAN__INT_INT_INT_POINTER,
+					 gnt_boolean_handled_accumulator, NULL, NULL,
 					 G_TYPE_BOOLEAN, 4, G_TYPE_INT, G_TYPE_INT, G_TYPE_INT, G_TYPE_POINTER);
 
 	signals[SIG_TERMINAL_REFRESH] =
@@ -1506,8 +1495,7 @@ gnt_wm_class_init(GntWMClass *klass)
 					 G_TYPE_FROM_CLASS(klass),
 					 G_SIGNAL_RUN_LAST,
 					 G_STRUCT_OFFSET(GntWMClass, terminal_refresh),
-					 NULL, NULL,
-					 g_cclosure_marshal_VOID__VOID,
+					 NULL, NULL, NULL,
 					 G_TYPE_NONE, 0);
 
 	gnt_bindable_class_register_action(GNT_BINDABLE_CLASS(klass), "window-next", window_next,

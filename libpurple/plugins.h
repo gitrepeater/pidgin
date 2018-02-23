@@ -60,12 +60,6 @@
  */
 typedef GPluginPlugin PurplePlugin;
 
-/**
- * PurplePluginClass:
- *
- * The base class for all #PurplePlugin's.
- * This type is an alias for GPluginPluginClass.
- */
 typedef GPluginPluginClass PurplePluginClass;
 
 #else /* !defined(PURPLE_PLUGINS) */
@@ -178,11 +172,6 @@ struct _PurplePluginInfo {
 	gpointer ui_data;
 };
 
-/**
- * PurplePluginInfoClass:
- *
- * The base class for all #PurplePluginInfo's.
- */
 struct _PurplePluginInfoClass {
 #ifdef PURPLE_PLUGINS
 	GPluginPluginInfoClass parent_class;
@@ -511,7 +500,7 @@ const gchar *purple_plugin_get_filename(const PurplePlugin *plugin);
  *
  * Returns a plugin's #PurplePluginInfo instance.
  *
- * Returns: (transfer none) The plugin's #PurplePluginInfo instance.
+ * Returns: (transfer none): The plugin's #PurplePluginInfo instance.
  * GPlugin refs the plugin info object before returning it. This workaround
  * is to avoid managing the reference counts everywhere in our codebase
  * where we use the plugin info. The plugin info instance is guaranteed to

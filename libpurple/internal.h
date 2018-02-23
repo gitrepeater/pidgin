@@ -49,9 +49,6 @@
  */
 #ifdef ENABLE_NLS
 #  include <locale.h>
-#  ifndef __APPLE_CC__
-#    define __APPLE_CC__ 0
-#  endif
 #  include <libintl.h>
 #  undef printf
 #  define _(String) ((const char *)dgettext(PACKAGE, String))
@@ -102,12 +99,6 @@
 
 #ifdef HAVE_LANGINFO_CODESET
 #include <langinfo.h>
-#endif
-
-#ifdef PURPLE_PLUGINS
-# ifdef HAVE_DLFCN_H
-#  include <dlfcn.h>
-# endif
 #endif
 
 #ifndef _WIN32
@@ -367,31 +358,6 @@ _purple_network_set_common_socket_flags(int fd);
  */
 int
 _purple_fstat(int fd, GStatBuf *st);
-
-/**
- * _purple_socket_cancel_with_connection:
- * @gc The connection.
- *
- * Cancels all #PurpleSocket instances bound with @gc.
- */
-void
-_purple_socket_cancel_with_connection(PurpleConnection *gc);
-
-/**
- * _purple_socket_init: (skip)
- *
- * Initializes the #PurpleSocket subsystem.
- */
-void
-_purple_socket_init(void);
-
-/**
- * _purple_socket_uninit: (skip)
- *
- * Uninitializes the #PurpleSocket subsystem.
- */
-void
-_purple_socket_uninit(void);
 
 /**
  * _purple_message_init: (skip)

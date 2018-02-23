@@ -46,27 +46,6 @@ void jabber_avatar_init(void)
 static void
 remove_avatar_0_12_nodes(JabberStream *js)
 {
-#if 0
-	/* See note below for why this is #if 0'd */
-
-	/* Publish an empty avatar according to the XEP-0084 v0.12 semantics */
-	PurpleXmlNode *publish, *item, *metadata;
-	/* publish the metadata */
-	publish = purple_xmlnode_new("publish");
-	purple_xmlnode_set_attrib(publish, "node", NS_AVATAR_0_12_METADATA);
-
-	item = purple_xmlnode_new_child(publish, "item");
-	purple_xmlnode_set_attrib(item, "id", "stop");
-
-	metadata = purple_xmlnode_new_child(item, "metadata");
-	purple_xmlnode_set_namespace(metadata, NS_AVATAR_0_12_METADATA);
-
-	purple_xmlnode_new_child(metadata, "stop");
-
-	/* publish */
-	jabber_pep_publish(js, publish);
-#endif
-
 	/*
 	 * This causes ejabberd 2.0.0 to kill the connection unceremoniously.
 	 * See https://support.process-one.net/browse/EJAB-623. When adiumx.com
@@ -130,7 +109,7 @@ void jabber_avatar_set(JabberStream *js, PurpleImage *img)
 			} ihdr;
 		} *png = NULL;
 
-		if (purple_image_get_size(img) > sizeof(*png))
+		if (purple_image_get_data_size(img) > sizeof(*png))
 			png = purple_image_get_data(img);
 
 		/* check if the data is a valid png file (well, at least to some extent) */
@@ -154,12 +133,13 @@ void jabber_avatar_set(JabberStream *js, PurpleImage *img)
 			char *lengthstring, *widthstring, *heightstring;
 
 			/* compute the sha1 hash */
-			char *hash = jabber_calculate_data_hash(
+			char *hash = g_compute_checksum_for_data(
+				G_CHECKSUM_SHA1,
 				purple_image_get_data(img),
-				purple_image_get_size(img), "sha1");
-			char *base64avatar = purple_base64_encode(
+				purple_image_get_data_size(img));
+			char *base64avatar = g_base64_encode(
 				purple_image_get_data(img),
-				purple_image_get_size(img));
+				purple_image_get_data_size(img));
 
 			publish = purple_xmlnode_new("publish");
 			purple_xmlnode_set_attrib(publish, "node", NS_AVATAR_1_1_DATA);
@@ -177,7 +157,7 @@ void jabber_avatar_set(JabberStream *js, PurpleImage *img)
 			g_free(base64avatar);
 
 			lengthstring = g_strdup_printf("%" G_GSIZE_FORMAT,
-				purple_image_get_size(img));
+				purple_image_get_data_size(img));
 			widthstring = g_strdup_printf("%u", width);
 			heightstring = g_strdup_printf("%u", height);
 
@@ -314,7 +294,7 @@ do_buddy_avatar_update_data(JabberStream *js, const char *from, PurpleXmlNode *i
 	if(!b64data)
 		return;
 
-	img = purple_base64_decode(b64data, &size);
+	img = g_base64_decode(b64data, &size);
 	if(!img) {
 		g_free(b64data);
 		return;
@@ -357,17 +337,17 @@ update_buddy_metadata(JabberStream *js, const char *from, PurpleXmlNode *items)
 		for(info = metadata->child; info; info = info->next) {
 			if(info->type == PURPLE_XMLNODE_TYPE_TAG)
 				has_children = TRUE;
-			if(info->type == PURPLE_XMLNODE_TYPE_TAG && !strcmp(info->name,"info")) {
+			if(info->type == PURPLE_XMLNODE_TYPE_TAG && purple_strequal(info->name,"info")) {
 				const char *type = purple_xmlnode_get_attrib(info,"type");
 				const char *id = purple_xmlnode_get_attrib(info,"id");
 
-				if(checksum && id && !strcmp(id, checksum)) {
+				if(checksum && id && purple_strequal(id, checksum)) {
 					/* we already have that avatar, so we don't have to do anything */
 					goodinfo = NULL;
 					break;
 				}
 				/* We'll only pick the png one for now. It's a very nice image format anyways. */
-				if(type && id && !goodinfo && !strcmp(type, "image/png"))
+				if(id && !goodinfo && purple_strequal(type, "image/png"))
 					goodinfo = info;
 			}
 		}

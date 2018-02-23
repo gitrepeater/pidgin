@@ -176,6 +176,7 @@ purple_buddy_icon_data_cache(PurpleImage *img)
 
 	if (!purple_image_save(img, path))
 		purple_debug_error("buddyicon", "failed to save icon %s", path);
+
 	g_free(path);
 }
 
@@ -510,7 +511,7 @@ purple_buddy_icon_get_data(const PurpleBuddyIcon *icon, size_t *len)
 	if (icon->img)
 	{
 		if (len != NULL)
-			*len = purple_image_get_size(icon->img);
+			*len = purple_image_get_data_size(icon->img);
 
 		return purple_image_get_data(icon->img);
 	}

@@ -51,7 +51,7 @@ int irc_cmd_away(struct irc_conn *irc, const char *cmd, const char *target, cons
 {
 	char *buf, *message;
 
-	if (args[0] && strcmp(cmd, "back")) {
+	if (args[0] && !purple_strequal(cmd, "back")) {
 		message = purple_markup_strip_html(args[0]);
 		purple_util_chrreplace(message, '\n', ' ');
 		buf = irc_format(irc, "v:", "AWAY", message);
@@ -277,7 +277,7 @@ int irc_cmd_mode(struct irc_conn *irc, const char *cmd, const char *target, cons
 	if (!args)
 		return 0;
 
-	if (!strcmp(cmd, "mode")) {
+	if (purple_strequal(cmd, "mode")) {
 		if (!args[0] && irc_ischannel(target))
 			buf = irc_format(irc, "vc", "MODE", target);
 		else if (args[0] && (*args[0] == '+' || *args[0] == '-'))
@@ -286,7 +286,7 @@ int irc_cmd_mode(struct irc_conn *irc, const char *cmd, const char *target, cons
 			buf = irc_format(irc, "vn", "MODE", args[0]);
 		else
 			return 0;
-	} else if (!strcmp(cmd, "umode")) {
+	} else if (purple_strequal(cmd, "umode")) {
 		if (!args[0])
 			return 0;
 		gc = purple_account_get_connection(irc->account);
@@ -340,16 +340,16 @@ int irc_cmd_op(struct irc_conn *irc, const char *cmd, const char *target, const 
 	if (!args || !args[0] || !*args[0])
 		return 0;
 
-	if (!strcmp(cmd, "op")) {
+	if (purple_strequal(cmd, "op")) {
 		sign = "+";
 		mode = "o";
-	} else if (!strcmp(cmd, "deop")) {
+	} else if (purple_strequal(cmd, "deop")) {
 		sign = "-";
 		mode = "o";
-	} else if (!strcmp(cmd, "voice")) {
+	} else if (purple_strequal(cmd, "voice")) {
 		sign = "+";
 		mode = "v";
-	} else if (!strcmp(cmd, "devoice")) {
+	} else if (purple_strequal(cmd, "devoice")) {
 		sign = "-";
 		mode = "v";
 	} else {
@@ -422,21 +422,32 @@ int irc_cmd_ping(struct irc_conn *irc, const char *cmd, const char *target, cons
 
 int irc_cmd_privmsg(struct irc_conn *irc, const char *cmd, const char *target, const char **args)
 {
+	int max_privmsg_arg_len;
 	const char *cur, *end;
+	gchar *salvaged;
 	char *msg, *buf;
 
 	if (!args || !args[0] || !args[1])
 		return 0;
 
-	cur = args[1];
-	end = args[1];
+	max_privmsg_arg_len = IRC_MAX_MSG_SIZE - strlen(args[0]) - 64;
+	salvaged = purple_utf8_salvage(args[1]);
+	cur = salvaged;
+	end = salvaged;
 	while (*end && *cur) {
 		end = strchr(cur, '\n');
 		if (!end)
 			end = cur + strlen(cur);
+		if (end - cur > max_privmsg_arg_len) {
+			/* this call is used to find the last valid character position in the first
+			 * max_privmsg_arg_len bytes of the utf-8 message
+			 */
+			g_utf8_validate(cur, max_privmsg_arg_len, &end);
+		}
+
 		msg = g_strndup(cur, end - cur);
 
-		if(!strcmp(cmd, "notice"))
+		if(purple_strequal(cmd, "notice"))
 			buf = irc_format(irc, "vt:", "NOTICE", args[0], msg);
 		else
 			buf = irc_format(irc, "vt:", "PRIVMSG", args[0], msg);
@@ -444,8 +455,13 @@ int irc_cmd_privmsg(struct irc_conn *irc, const char *cmd, const char *target, c
 		irc_send(irc, buf);
 		g_free(msg);
 		g_free(buf);
-		cur = end + 1;
+		cur = end;
+		if(*cur == '\n') {
+			cur++;
+		}
 	}
+
+	g_free(salvaged);
 
 	return 0;
 }
@@ -603,9 +619,9 @@ int irc_cmd_wallops(struct irc_conn *irc, const char *cmd, const char *target, c
 	if (!args || !args[0])
 		return 0;
 
-	if (!strcmp(cmd, "wallops"))
+	if (purple_strequal(cmd, "wallops"))
 		buf = irc_format(irc, "v:", "WALLOPS", args[0]);
-	else if (!strcmp(cmd, "operwall"))
+	else if (purple_strequal(cmd, "operwall"))
 		buf = irc_format(irc, "v:", "OPERWALL", args[0]);
 	else
 		return 0;

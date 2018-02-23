@@ -53,9 +53,6 @@ xmpp_protocol_init(PurpleProtocol *protocol)
 	ADD_VALUE(encryption_values, _("Require encryption"), "require_tls");
 	ADD_VALUE(encryption_values, _("Use encryption if available"), "opportunistic_tls");
 	ADD_VALUE(encryption_values, _("Use old-style SSL"), "old_ssl");
-#if 0
-	ADD_VALUE(encryption_values, "None", "none");
-#endif
 	encryption_values = g_list_reverse(encryption_values);
 
 #undef ADD_VALUE
@@ -89,8 +86,9 @@ xmpp_protocol_init(PurpleProtocol *protocol)
 	protocol->account_options = g_list_append(protocol->account_options,
 						  option);
 
-	/* this should probably be part of global smiley theme settings later on,
-	  shared with MSN */
+	/* this should probably be part of global smiley theme settings
+	 * later on
+	 */
 	option = purple_account_option_bool_new(_("Show Custom Smileys"),
 		"custom_smileys", TRUE);
 	protocol->account_options = g_list_append(protocol->account_options,

@@ -258,7 +258,7 @@ purple_im_conversation_start_typing_timeout(PurpleIMConversation *im, int timeou
 	if (priv->typing_timeout > 0)
 		purple_im_conversation_stop_typing_timeout(im);
 
-	priv->typing_timeout = purple_timeout_add_seconds(timeout, reset_typing_cb, im);
+	priv->typing_timeout = g_timeout_add_seconds(timeout, reset_typing_cb, im);
 }
 
 void
@@ -271,7 +271,7 @@ purple_im_conversation_stop_typing_timeout(PurpleIMConversation *im)
 	if (priv->typing_timeout == 0)
 		return;
 
-	purple_timeout_remove(priv->typing_timeout);
+	g_source_remove(priv->typing_timeout);
 	priv->typing_timeout = 0;
 }
 
@@ -315,7 +315,7 @@ purple_im_conversation_start_send_typed_timeout(PurpleIMConversation *im)
 
 	g_return_if_fail(priv != NULL);
 
-	priv->send_typed_timeout = purple_timeout_add_seconds(SEND_TYPED_TIMEOUT_SECONDS,
+	priv->send_typed_timeout = g_timeout_add_seconds(SEND_TYPED_TIMEOUT_SECONDS,
 	                                                    send_typed_cb, im);
 }
 
@@ -329,7 +329,7 @@ purple_im_conversation_stop_send_typed_timeout(PurpleIMConversation *im)
 	if (priv->send_typed_timeout == 0)
 		return;
 
-	purple_timeout_remove(priv->send_typed_timeout);
+	g_source_remove(priv->send_typed_timeout);
 	priv->send_typed_timeout = 0;
 }
 
@@ -805,14 +805,6 @@ chat_conversation_write_message(PurpleConversation *conv, PurpleMessage *msg)
 	{
 		return;
 	}
-
-#if 0
-	PurpleAccount *account = purple_conversation_get_account(conv);
-	/* XXX: this should not be necessary */
-	if (purple_strequal(purple_normalize(account, who), priv->nick)) {
-		flags |= PURPLE_MESSAGE_SEND;
-	}
-#endif
 
 	flags = purple_message_get_flags(msg);
 	if (flags & PURPLE_MESSAGE_RECV) {
@@ -1455,36 +1447,11 @@ purple_chat_conversation_finalize(GObject *object)
 	{
 		/* Still connected */
 		int chat_id = purple_chat_conversation_get_id(chat);
-#if 0
-		/*
-		 * This is unfortunately necessary, because calling
-		 * purple_serv_chat_leave() calls this purple_conversation_destroy(),
-		 * which leads to two calls here.. We can't just return after
-		 * this, because then it'll return on the next pass. So, since
-		 * purple_serv_got_chat_left(), which is eventually called from the
-		 * protocol that purple_serv_chat_leave() calls, removes this conversation
-		 * from the gc's buddy_chats list, we're going to check to see
-		 * if this exists in the list. If so, we want to return after
-		 * calling this, because it'll be called again. If not, fall
-		 * through, because it'll have already been removed, and we'd
-		 * be on the 2nd pass.
-		 *
-		 * Long paragraph. <-- Short sentence.
-		 *
-		 *   -- ChipX86
-		 */
 
-		if (gc && g_slist_find(gc->buddy_chats, conv) != NULL) {
-			purple_serv_chat_leave(gc, chat_id);
-
-			return;
-		}
-#endif
 		/*
-		 * Instead of all of that, lets just close the window when
-		 * the user tells us to, and let the protocol deal with the
-		 * internals on it's own time. Don't do this if the protocol already
-		 * knows it left the chat.
+		 * Close the window when the user tells us to, and let the protocol
+		 * deal with the internals on it's own time. Don't do this if the
+		 * protocol already knows it left the chat.
 		 */
 		if (!purple_chat_conversation_has_left(chat))
 			purple_serv_chat_leave(gc, chat_id);

@@ -57,11 +57,11 @@ G_BEGIN_DECLS
 
 /**
  * PidginMiniDialog:
- * @contents: A GtkVBox into which extra widgets for the dialog should be packed.
+ * @contents: A GtkBox into which extra widgets for the dialog should be packed.
  *
  * A widget resembling a diminutive dialog box, designed to be embedded in the
  * #PidginBuddyList.  Mini-dialogs have titles, optional descriptions, and a row
- * of buttons at the bottom; above the buttons is a #GtkHBox into which
+ * of buttons at the bottom; above the buttons is a #GtkBox into which
  * you can pack any random widgets you want to add to the dialog.  When any of
  * the dialog's buttons is clicked, the dialog will be destroyed.
  *
@@ -91,7 +91,7 @@ G_BEGIN_DECLS
  * </informaltable>
  */
 typedef struct {
-	GtkVBox parent;
+	GtkBox parent;
 	gpointer priv;
 
 	/*< public >*/
@@ -187,7 +187,7 @@ void pidgin_mini_dialog_enable_description_markup(PidginMiniDialog *mini_dialog)
 /**
  * pidgin_mini_dialog_set_link_callback:
  * @mini_dialog: a mini-dialog
- * @cb: the callback to invoke
+ * @cb: (scope call): the callback to invoke
  * @user_data: the user data to pass to the callback
  *
  * Sets a callback which gets invoked when a hyperlink in the dialog's description is clicked on.
@@ -218,7 +218,7 @@ void pidgin_mini_dialog_set_custom_icon(PidginMiniDialog *mini_dialog,
  * pidgin_mini_dialog_add_button:
  * @mini_dialog: a mini-dialog
  * @text:        the text to display on the new button
- * @clicked_cb:  the function to call when the button is clicked
+ * @clicked_cb: (scope call): the function to call when the button is clicked
  * @user_data:   arbitrary data to pass to @clicked_cb when it is
  *                    called.
  *
@@ -232,6 +232,11 @@ void pidgin_mini_dialog_add_button(PidginMiniDialog *mini_dialog,
 
 /**
  * pidgin_mini_dialog_add_non_closing_button:
+ * @mini_dialog: a mini-dialog
+ * @text:        the text to display on the new button
+ * @clicked_cb: (scope call): the function to call when the button is clicked
+ * @user_data:   arbitrary data to pass to @clicked_cb when it is
+ *                    called.
  *
  * Equivalent to pidgin_mini_dialog_add_button(), the only difference
  * is that the mini-dialog won't be closed after the button is clicked.

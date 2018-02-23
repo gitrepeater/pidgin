@@ -426,11 +426,6 @@ static int mw_session_io_write(struct mwSession *session,
                                    tmp);
 	g_free(tmp);
 
-#if 0
-    close(pd->socket);
-    pd->socket = 0;
-#endif
-
     return -1;
   }
 
@@ -697,7 +692,7 @@ static void blist_export(PurpleConnection *gc, struct mwSametimeList *stlist) {
 
     /* if the group has an owner and we're not it, skip it */
     owner = purple_blist_node_get_string(gn, GROUP_KEY_OWNER);
-    if(owner && strcmp(owner, purple_account_get_username(acct)))
+    if(owner && !purple_strequal(owner, purple_account_get_username(acct)))
       continue;
 
     /* the group's actual name may be different from the purple group's
@@ -814,7 +809,7 @@ static gboolean blist_save_cb(gpointer data) {
 static void blist_schedule(struct mwPurpleProtocolData *pd) {
   if(pd->save_event) return;
 
-  pd->save_event = purple_timeout_add_seconds(BLIST_SAVE_SECONDS,
+  pd->save_event = g_timeout_add_seconds(BLIST_SAVE_SECONDS,
 				    blist_save_cb, pd);
 }
 
@@ -950,8 +945,8 @@ static PurpleGroup *group_ensure(PurpleConnection *gc,
 
     DEBUG_INFO("found group named %s, owned by %s\n", NSTR(n), NSTR(o));
 
-    if(n && !strcmp(n, name)) {
-      if(!o || !strcmp(o, owner)) {
+    if(n && purple_strequal(n, name)) {
+      if(!o || purple_strequal(o, owner)) {
 	DEBUG_INFO("that'll work\n");
 	group = (PurpleGroup *) gn;
 	break;
@@ -1182,7 +1177,7 @@ static void blist_sync(PurpleConnection *gc, struct mwSametimeList *stlist) {
 
     /* dynamic group belonging to this account. don't prune contents */
     owner = purple_blist_node_get_string(gn, GROUP_KEY_OWNER);
-    if(owner && !strcmp(owner, acct_n))
+    if(owner && purple_strequal(owner, acct_n))
        continue;
 
     /* we actually are synching by this key as opposed to the group
@@ -1214,7 +1209,7 @@ static void blist_sync(PurpleConnection *gc, struct mwSametimeList *stlist) {
     gboolean del = TRUE;
 
     owner = purple_blist_node_get_string(gn, GROUP_KEY_OWNER);
-    if(owner && strcmp(owner, acct_n)) {
+    if(owner && !purple_strequal(owner, acct_n)) {
       /* it's a specialty group belonging to another account with some
 	 of our members in it, so don't fully delete it */
       del = FALSE;
@@ -1353,21 +1348,9 @@ static void blist_node_menu_cb(PurpleBlistNode *node,
   /* better make sure we're connected */
   if(! purple_account_is_connected(acct)) return;
 
-#if 0
-  /* if there's anyone in the group for this acct, offer to invite
-     them all to a conference */
-  group = (PurpleGroup *) node;
-  if(purple_group_on_account(group, acct)) {
-    act = purple_menu_action_new(_("Invite Group to Conference..."),
-                               PURPLE_CALLBACK(blist_menu_group_invite),
-                               pd, NULL);
-    *menu = g_list_append(*menu, NULL);
-  }
-#endif
-
   /* check if it's a NAB group for this account */
   owner = purple_blist_node_get_string(node, GROUP_KEY_OWNER);
-  if(owner && !strcmp(owner, purple_account_get_username(acct))) {
+  if(owner && purple_strequal(owner, purple_account_get_username(acct))) {
     act = purple_menu_action_new(_("Get Notes Address Book Info"),
                                PURPLE_CALLBACK(blist_menu_nab), pd, NULL);
     *menu = g_list_append(*menu, act);
@@ -1439,7 +1422,7 @@ static void services_starting(struct mwPurpleProtocolData *pd) {
     /* if the group is ownerless, or has an owner and we're not it,
        skip it */
     owner = purple_blist_node_get_string(l, GROUP_KEY_OWNER);
-    if(!owner || strcmp(owner, purple_account_get_username(acct)))
+    if(!owner || !purple_strequal(owner, purple_account_get_username(acct)))
       continue;
 
     gt = purple_blist_node_get_int(l, GROUP_KEY_TYPE);
@@ -1479,7 +1462,7 @@ static void session_loginRedirect(struct mwSession *session,
 					 MW_PLUGIN_DEFAULT_HOST);
 
   if(purple_account_get_bool(account, MW_KEY_FORCE, FALSE) ||
-     !host || (! strcmp(current_host, host)) ||
+     !host || purple_strequal(current_host, host) ||
      (purple_proxy_connect(gc, account, host, port, connect_cb, pd) == NULL)) {
 
     /* if we're configured to force logins, or if we're being
@@ -2626,13 +2609,6 @@ static void mw_conversation_closed(struct mwConversation *conv,
     }
   }
 
-#if 0
-  /* don't do this, to prevent the occasional weird sending of
-     formatted messages as plaintext when the other end closes the
-     conversation after we've begun composing the message */
-  convo_nofeatures(conv);
-#endif
-
   mwConversation_removeClientData(conv);
 }
 
@@ -3559,42 +3535,6 @@ static void blist_menu_conf(PurpleBlistNode *node, gpointer data) {
 }
 
 
-#if 0
-static void blist_menu_announce(PurpleBlistNode *node, gpointer data) {
-  PurpleBuddy *buddy = (PurpleBuddy *) node;
-  PurpleAccount *acct;
-  PurpleConnection *gc;
-  struct mwPurpleProtocolData *pd;
-  struct mwSession *session;
-  char *rcpt_name;
-  GList *rcpt;
-
-  g_return_if_fail(node != NULL);
-  g_return_if_fail(PURPLE_IS_BUDDY(node));
-
-  acct = buddy->account;
-  g_return_if_fail(acct != NULL);
-
-  gc = purple_account_get_connection(acct);
-  g_return_if_fail(gc != NULL);
-
-  pd = purple_connection_get_protocol_data(gc);
-  g_return_if_fail(pd != NULL);
-
-  rcpt_name = g_strdup_printf("@U %s", buddy->name);
-  rcpt = g_list_prepend(NULL, rcpt_name);
-
-  session = pd->session;
-  mwSession_sendAnnounce(session, FALSE,
-			 "This is a TEST announcement. Please ignore.",
-			 rcpt);
-
-  g_list_free(rcpt);
-  g_free(rcpt_name);
-}
-#endif
-
-
 static GList *mw_protocol_blist_node_menu(PurpleBlistNode *node) {
   GList *l = NULL;
   PurpleMenuAction *act;
@@ -3607,12 +3547,6 @@ static GList *mw_protocol_blist_node_menu(PurpleBlistNode *node) {
   act = purple_menu_action_new(_("Invite to Conference..."),
                              PURPLE_CALLBACK(blist_menu_conf), NULL, NULL);
   l = g_list_append(l, act);
-
-#if 0
-  act = purple_menu_action_new(_("Send TEST Announcement"),
-			     PURPLE_CALLBACK(blist_menu_announce), NULL, NULL);
-  l = g_list_append(l, act);
-#endif
 
   /** note: this never gets called for a PurpleGroup, have to use the
       blist-node-extended-menu signal for that. The function
@@ -3747,7 +3681,7 @@ static void mw_protocol_close(PurpleConnection *gc) {
 
   /* get rid of the blist save timeout */
   if(pd->save_event) {
-    purple_timeout_remove(pd->save_event);
+    g_source_remove(pd->save_event);
     pd->save_event = 0;
     blist_store(pd);
   }
@@ -3878,8 +3812,8 @@ static char *im_mime_convert(PurpleConnection *gc,
 
       /* obtain and base64 encode the image data, and put it in the
 	 mime part */
-      size = purple_image_get_size(img);
-      data = purple_base64_encode(purple_image_get_data(img), size);
+      size = purple_image_get_data_size(img);
+      data = g_base64_encode(purple_image_get_data(img), size);
       purple_mime_part_set_data(part, data);
       g_free(data);
 
@@ -4189,13 +4123,13 @@ static void mw_protocol_set_status(PurpleAccount *acct, PurpleStatus *status) {
   mwUserStatus_clone(&stat, mwSession_getUserStatus(session));
 
   /* determine the state */
-  if(! strcmp(state, MW_STATE_ACTIVE)) {
+  if(purple_strequal(state, MW_STATE_ACTIVE)) {
     stat.status = mwStatus_ACTIVE;
 
-  } else if(! strcmp(state, MW_STATE_AWAY)) {
+  } else if(purple_strequal(state, MW_STATE_AWAY)) {
     stat.status = mwStatus_AWAY;
 
-  } else if(! strcmp(state, MW_STATE_BUSY)) {
+  } else if(purple_strequal(state, MW_STATE_BUSY)) {
     stat.status = mwStatus_BUSY;
   }
 
@@ -4360,7 +4294,7 @@ static void add_buddy_resolved(struct mwServiceResolve *srvc,
       struct mwResolveMatch *match = res->matches->data;
 
       /* only one? that might be the right one! */
-      if(strcmp(res->name, match->id)) {
+      if(!purple_strequal(res->name, match->id)) {
 	/* uh oh, the single result isn't identical to the search
 	   term, better safe then sorry, so let's make sure it's who
 	   the user meant to add */
@@ -4390,40 +4324,6 @@ static void add_buddy_resolved(struct mwServiceResolve *srvc,
 
     return;
   }
-
-#if 0
-  /* fall-through indicates that we couldn't find a matching user in
-     the resolve service (ether error or zero results), so we remove
-     this buddy */
-
-  /* note: I can't really think of a good reason to alter the buddy
-     list in any way. There has been at least one report where the
-     resolve service isn't returning correct results anyway, so let's
-     just leave them in the list. I'm just going to if0 this section
-     out unless I can think of a very good reason to do this. -siege */
-
-  DEBUG_INFO("no such buddy in community\n");
-  purple_blist_remove_buddy(buddy);
-  blist_schedule(pd);
-
-  if(res && res->name) {
-    /* compose and display an error message */
-    const char *msgA;
-    const char *msgB;
-    char *msg;
-
-    msgA = _("Unable to add user: user not found");
-
-    msgB = _("The identifier '%s' did not match any users in your"
-	     " Sametime community. This entry has been removed from"
-	     " your buddy list.");
-    msg = g_strdup_printf(msgB, NSTR(res->name));
-
-    purple_notify_error(gc, _("Unable to add user"), msgA, msg);
-
-    g_free(msg);
-  }
-#endif
 }
 
 
@@ -4649,7 +4549,7 @@ static struct mwConference *conf_find(struct mwServiceConference *srvc,
   ll = mwServiceConference_getConferences(srvc);
   for(l = ll; l; l = l->next) {
     struct mwConference *c = l->data;
-    if(! strcmp(name, mwConference_getName(c))) {
+    if(purple_strequal(name, mwConference_getName(c))) {
       conf = c;
       break;
     }
@@ -4941,7 +4841,8 @@ static void mw_protocol_remove_group(PurpleConnection *gc, PurpleGroup *group) {
 }
 
 
-static gboolean mw_protocol_can_receive_file(PurpleConnection *gc,
+static gboolean mw_protocol_can_receive_file(PurpleProtocolXfer *prplxfer,
+					 PurpleConnection *gc,
 					 const char *who) {
   struct mwPurpleProtocolData *pd;
   struct mwServiceAware *srvc;
@@ -5030,7 +4931,7 @@ static void ft_outgoing_cancel(PurpleXfer *xfer) {
 }
 
 
-static PurpleXfer *mw_protocol_new_xfer(PurpleConnection *gc, const char *who) {
+static PurpleXfer *mw_protocol_new_xfer(PurpleProtocolXfer *prplxfer, PurpleConnection *gc, const char *who) {
   PurpleAccount *acct;
   PurpleXfer *xfer;
 
@@ -5046,10 +4947,11 @@ static PurpleXfer *mw_protocol_new_xfer(PurpleConnection *gc, const char *who) {
   return xfer;
 }
 
-static void mw_protocol_send_file(PurpleConnection *gc,
+static void mw_protocol_send_file(PurpleProtocolXfer *prplxfer,
+			      PurpleConnection *gc,
 			      const char *who, const char *file) {
 
-  PurpleXfer *xfer = mw_protocol_new_xfer(gc, who);
+  PurpleXfer *xfer = mw_protocol_new_xfer(prplxfer, gc, who);
 
   if(file) {
     DEBUG_INFO("file != NULL\n");
@@ -5061,36 +4963,6 @@ static void mw_protocol_send_file(PurpleConnection *gc,
   }
 }
 
-#if 0
-static PurplePluginPrefFrame *
-mw_plugin_get_plugin_pref_frame(PurplePlugin *plugin) {
-  PurplePluginPrefFrame *frame;
-  PurplePluginPref *pref;
-
-  frame = purple_plugin_pref_frame_new();
-
-  pref = purple_plugin_pref_new_with_label(_("Remotely Stored Buddy List"));
-  purple_plugin_pref_frame_add(frame, pref);
-
-
-  pref = purple_plugin_pref_new_with_name(MW_PROTOCOL_OPT_BLIST_ACTION);
-  purple_plugin_pref_set_label(pref, _("Buddy List Storage Mode"));
-
-  purple_plugin_pref_set_pref_type(pref, PURPLE_PLUGIN_PREF_CHOICE);
-  purple_plugin_pref_add_choice(pref, _("Local Buddy List Only"),
-			      GINT_TO_POINTER(blist_choice_LOCAL));
-  purple_plugin_pref_add_choice(pref, _("Merge List from Server"),
-			      GINT_TO_POINTER(blist_choice_MERGE));
-  purple_plugin_pref_add_choice(pref, _("Merge and Save List to Server"),
-			      GINT_TO_POINTER(blist_choice_STORE));
-  purple_plugin_pref_add_choice(pref, _("Synchronize List with Server"),
-			      GINT_TO_POINTER(blist_choice_SYNCH));
-
-  purple_plugin_pref_frame_add(frame, pref);
-
-  return frame;
-}
-#endif
 
 static void st_import_action_cb(PurpleConnection *gc, char *filename) {
   struct mwSametimeList *l;
@@ -5701,7 +5573,7 @@ mw_protocol_privacy_iface_init(PurpleProtocolPrivacyIface *privacy_iface)
 
 
 static void
-mw_protocol_xfer_iface_init(PurpleProtocolXferIface *xfer_iface)
+mw_protocol_xfer_iface_init(PurpleProtocolXferInterface *xfer_iface)
 {
   xfer_iface->can_receive = mw_protocol_can_receive_file;
   xfer_iface->send        = mw_protocol_send_file;
@@ -5727,7 +5599,7 @@ PURPLE_DEFINE_TYPE_EXTENDED(
   PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_PRIVACY_IFACE,
                                     mw_protocol_privacy_iface_init)
 
-  PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_XFER_IFACE,
+  PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_XFER,
                                     mw_protocol_xfer_iface_init)
 );
 

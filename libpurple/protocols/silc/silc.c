@@ -103,15 +103,15 @@ silcpurple_set_status(PurpleAccount *account, PurpleStatus *status)
 		  SILC_UMODE_INDISPOSED |
 		  SILC_UMODE_PAGE);
 
-	if (!strcmp(state, "hyper"))
+	if (purple_strequal(state, "hyper"))
 		mode |= SILC_UMODE_HYPER;
-	else if (!strcmp(state, "away"))
+	else if (purple_strequal(state, "away"))
 		mode |= SILC_UMODE_GONE;
-	else if (!strcmp(state, "busy"))
+	else if (purple_strequal(state, "busy"))
 		mode |= SILC_UMODE_BUSY;
-	else if (!strcmp(state, "indisposed"))
+	else if (purple_strequal(state, "indisposed"))
 		mode |= SILC_UMODE_INDISPOSED;
-	else if (!strcmp(state, "page"))
+	else if (purple_strequal(state, "page"))
 		mode |= SILC_UMODE_PAGE;
 
 	/* Send UMODE */
@@ -221,7 +221,7 @@ silcpurple_scheduler(SilcSchedule schedule,
 	    /* Add timeout */
 	    ptask = silc_calloc(1, sizeof(*ptask));
 	    ptask->sg = sg;
-	    ptask->tag = purple_timeout_add((seconds * 1000) +
+	    ptask->tag = g_timeout_add((seconds * 1000) +
 					    (useconds / 1000),
 					    silcpurple_scheduler_timeout,
 					    ptask);
@@ -602,13 +602,13 @@ silcpurple_login(PurpleAccount *account)
 	cipher = purple_account_get_string(account, "cipher",
 					   SILC_DEFAULT_CIPHER);
 	for (i = 0; silc_default_ciphers[i].name; i++)
-		if (!strcmp(silc_default_ciphers[i].name, cipher)) {
+		if (purple_strequal(silc_default_ciphers[i].name, cipher)) {
 			silc_cipher_register(&(silc_default_ciphers[i]));
 			break;
 		}
 	hmac = purple_account_get_string(account, "hmac", SILC_DEFAULT_HMAC);
 	for (i = 0; silc_default_hmacs[i].name; i++)
-		if (!strcmp(silc_default_hmacs[i].name, hmac)) {
+		if (purple_strequal(silc_default_hmacs[i].name, hmac)) {
 			silc_hmac_register(&(silc_default_hmacs[i]));
 			break;
 		}
@@ -646,7 +646,7 @@ silcpurple_login(PurpleAccount *account)
 
 #if __SILC_TOOLKIT_VERSION < SILC_VERSION(1,1,1)
 	/* Schedule SILC using Glib's event loop */
-	sg->scheduler = purple_timeout_add(300, (GSourceFunc)silcpurple_scheduler, client);
+	sg->scheduler = g_timeout_add(300, (GSourceFunc)silcpurple_scheduler, client);
 #else
 	/* Run SILC scheduler */
 	sg->tasks = silc_dlist_init();
@@ -723,10 +723,10 @@ silcpurple_close(PurpleConnection *gc)
 #endif /* __SILC_TOOLKIT_VERSION */
 
 	if (sg->scheduler)
-		purple_timeout_remove(sg->scheduler);
+		g_source_remove(sg->scheduler);
 
 	purple_debug_info("silc", "Scheduling destruction of SilcPurple %p\n", sg);
-	purple_timeout_add(1, (GSourceFunc)silcpurple_close_final, sg);
+	g_timeout_add(1, (GSourceFunc)silcpurple_close_final, sg);
 }
 
 
@@ -1038,14 +1038,6 @@ silcpurple_attrs(PurpleProtocolAction *action)
 	purple_request_fields_add_group(fields, g);
 
 	g = purple_request_field_group_new(NULL);
-#if 0
-	f = purple_request_field_label_new("l2", _("Online Services"));
-	purple_request_field_group_add_field(g, f);
-	f = purple_request_field_bool_new("services",
-					_("Let others see what services you are using"),
-					TRUE);
-	purple_request_field_group_add_field(g, f);
-#endif
 #ifdef HAVE_SYS_UTSNAME_H
 	f = purple_request_field_bool_new("device",
 					_("Let others see what computer you are using"),
@@ -1159,7 +1151,7 @@ silcpurple_create_keypair_cb(PurpleConnection *gc, PurpleRequestFields *fields)
 	else
 		pass2 = "";
 
-	if (strcmp(pass1, pass2)) {
+	if (!purple_strequal(pass1, pass2)) {
 		purple_notify_error(gc, _("Create New SILC Key Pair"),
 			_("Passphrases do not match"), NULL,
 			purple_request_cpar_from_connection(gc));
@@ -2091,20 +2083,6 @@ silcpurple_register_commands(void)
 			"prpl-silc", silcpurple_cmd_generic,
 			_("ping:  Send PING to the connected server"), NULL);
 	cmds = g_slist_prepend(cmds, GUINT_TO_POINTER(id));
-
-#if 0 /* Purple doesn't handle these yet */
-	id = purple_cmd_register("users", "w", PURPLE_CMD_P_PROTOCOL,
-			PURPLE_CMD_FLAG_CHAT | PURPLE_CMD_FLAG_PROTOCOL_ONLY,
-			"prpl-silc", silcpurple_cmd_users,
-			_("users &lt;channel&gt;:  List users in channel"));
-	cmds = g_slist_prepend(cmds, GUINT_TO_POINTER(id));
-
-	id = purple_cmd_register("names", "ww", PURPLE_CMD_P_PROTOCOL,
-			PURPLE_CMD_FLAG_CHAT | PURPLE_CMD_FLAG_PROTOCOL_ONLY |
-			PURPLE_CMD_FLAG_ALLOW_WRONG_ARGS, "prpl-silc", silcpurple_cmd_names,
-			_("names [-count|-ops|-halfops|-voices|-normal] &lt;channel(s)&gt;:  List specific users in channel(s)"));
-	cmds = g_slist_prepend(cmds, GUINT_TO_POINTER(id));
-#endif
 }
 
 static void
@@ -2135,14 +2113,6 @@ static PurpleWhiteboardOps silcpurple_wb_ops =
 	NULL
 };
 
-#if 0
-static SilcBool silcpurple_debug_cb(char *file, char *function, int line,
-		char *message, void *context)
-{
-	purple_debug_info("SILC", "%s:%d:%s - %s\n", file ? file : "(null)", line, function ? function : "(null)", message ? message : "(null)");
-	return TRUE;
-}
-#endif
 
 static void
 silcpurple_protocol_init(PurpleProtocol *protocol)
@@ -2283,7 +2253,7 @@ silcpurple_protocol_roomlist_iface_init(PurpleProtocolRoomlistIface *roomlist_if
 }
 
 static void
-silcpurple_protocol_xfer_iface_init(PurpleProtocolXferIface *xfer_iface)
+silcpurple_protocol_xfer_iface_init(PurpleProtocolXferInterface *xfer_iface)
 {
 	xfer_iface->send     = silcpurple_ftp_send_file;
 	xfer_iface->new_xfer = silcpurple_ftp_new_xfer;
@@ -2348,13 +2318,6 @@ plugin_load(PurplePlugin *plugin, GError **error)
 
 	silc_log_set_callback(SILC_LOG_ERROR, silcpurple_log_error, NULL);
 	silcpurple_register_commands();
-
-#if 0
-silc_log_debug(TRUE);
-silc_log_set_debug_string("*client*");
-silc_log_quick(TRUE);
-silc_log_set_debug_callbacks(silcpurple_debug_cb, NULL, NULL, NULL);
-#endif
 
 	return TRUE;
 }

@@ -706,9 +706,9 @@ static void ggp_login(PurpleAccount *account)
 		"opportunistic_tls");
 	purple_debug_info("gg", "Requested encryption type: %s\n",
 		encryption_type);
-	if (strcmp(encryption_type, "opportunistic_tls") == 0)
+	if (purple_strequal(encryption_type, "opportunistic_tls"))
 		glp->tls = GG_SSL_ENABLED;
-	else if (strcmp(encryption_type, "require_tls") == 0) {
+	else if (purple_strequal(encryption_type, "require_tls")) {
 		if (gg_libgadu_check_feature(GG_LIBGADU_FEATURE_SSL))
 			glp->tls = GG_SSL_REQUIRED;
 		else {
@@ -728,9 +728,9 @@ static void ggp_login(PurpleAccount *account)
 		"protocol_version", "default");
 	purple_debug_info("gg", "Requested protocol version: %s\n",
 		protocol_version);
-	if (g_strcmp0(protocol_version, "gg10") == 0)
+	if (purple_strequal(protocol_version, "gg10"))
 		glp->protocol_version = GG_PROTOCOL_VERSION_100;
-	else if (g_strcmp0(protocol_version, "gg11") == 0)
+	else if (purple_strequal(protocol_version, "gg11"))
 		glp->protocol_version = GG_PROTOCOL_VERSION_110;
 	glp->compatibility = GG_COMPAT_1_12_0;
 
@@ -828,7 +828,7 @@ static void ggp_add_buddy(PurpleConnection *gc, PurpleBuddy *buddy, PurpleGroup 
 	gg_add_notify(info->session, ggp_str_to_uin(name));
 
 	/* gg server won't tell us our status here */
-	if (strcmp(purple_account_get_username(account), name) == 0)
+	if (purple_strequal(purple_account_get_username(account), name))
 		ggp_status_fake_to_self(gc);
 
 	ggp_roster_add_buddy(gc, buddy, group, message);
@@ -1071,7 +1071,7 @@ ggp_protocol_privacy_iface_init(PurpleProtocolPrivacyIface *privacy_iface)
 }
 
 static void
-ggp_protocol_xfer_iface_init(PurpleProtocolXferIface *xfer_iface)
+ggp_protocol_xfer_iface_init(PurpleProtocolXferInterface *xfer_iface)
 {
 	xfer_iface->can_receive = ggp_edisc_xfer_can_receive_file;
 	xfer_iface->send        = ggp_edisc_xfer_send_file;
@@ -1099,7 +1099,7 @@ PURPLE_DEFINE_TYPE_EXTENDED(
 	PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_PRIVACY_IFACE,
 	                                  ggp_protocol_privacy_iface_init)
 
-	PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_XFER_IFACE,
+	PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_XFER,
 	                                  ggp_protocol_xfer_iface_init)
 );
 

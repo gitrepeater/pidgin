@@ -41,7 +41,7 @@ add_pref_box(GtkSizeGroup *sg, GtkWidget *parent, const char *text,
 
 	label = gtk_label_new_with_mnemonic(text);
 	gtk_size_group_add_widget(sg, label);
-	gtk_misc_set_alignment(GTK_MISC(label), 0, 0.5);
+	gtk_label_set_xalign(GTK_LABEL(label), 0);
 	gtk_box_pack_start(GTK_BOX(hbox), label, FALSE, FALSE, 0);
 	gtk_widget_show(label);
 
@@ -143,19 +143,15 @@ add_cb(GtkWidget *w, GevoNewPersonDialog *dialog)
 		if (*email)
 			e_contact_set(contact, E_CONTACT_EMAIL_1, (gpointer)email);
 
-		if (!strcmp(im_service, "prpl-aim"))
+		if (purple_strequal(im_service, "prpl-aim"))
 			field = E_CONTACT_IM_AIM;
-		else if (!strcmp(im_service, "prpl-icq"))
+		else if (purple_strequal(im_service, "prpl-icq"))
 			field = E_CONTACT_IM_ICQ;
-		else if (!strcmp(im_service, "prpl-yahoo"))
-			field = E_CONTACT_IM_YAHOO;
-		else if (!strcmp(im_service, "prpl-jabber"))
+		else if (purple_strequal(im_service, "prpl-jabber"))
 			field = E_CONTACT_IM_JABBER;
-		else if (!strcmp(im_service, "prpl-msn"))
-			field = E_CONTACT_IM_MSN;
-		else if (!strcmp(im_service, "prpl-novell"))
+		else if (purple_strequal(im_service, "prpl-novell"))
 			field = E_CONTACT_IM_GROUPWISE;
-		else if (!strcmp(im_service, "prpl-gg"))
+		else if (purple_strequal(im_service, "prpl-gg"))
 			field = E_CONTACT_IM_GADUGADU;
 
 		if (field > 0)
@@ -268,7 +264,8 @@ gevo_new_person_dialog_show(EBook *book, EContact *contact,
 	}
 
 	gtk_label_set_line_wrap(GTK_LABEL(label), TRUE);
-	gtk_misc_set_alignment(GTK_MISC(label), 0, 0);
+	gtk_label_set_xalign(GTK_LABEL(label), 0);
+	gtk_label_set_yalign(GTK_LABEL(label), 0);
 	gtk_box_pack_start(GTK_BOX(vbox), label, FALSE, TRUE, 0);
 	gtk_widget_show(label);
 
@@ -308,7 +305,8 @@ gevo_new_person_dialog_show(EBook *book, EContact *contact,
 
 		/* Optional Information section */
 		label = gtk_label_new(_("Optional information:"));
-		gtk_misc_set_alignment(GTK_MISC(label), 0, 0);
+		gtk_label_set_xalign(GTK_LABEL(label), 0);
+		gtk_label_set_yalign(GTK_LABEL(label), 0);
 		gtk_box_pack_start(GTK_BOX(vbox), label, FALSE, FALSE, 0);
 		gtk_widget_show(label);
 	}
@@ -320,7 +318,7 @@ gevo_new_person_dialog_show(EBook *book, EContact *contact,
 
 #if 0
 	/* Now the left side of the hbox */
-	vbox2 = gtk_vbox_new(FALSE, 12);
+	vbox2 = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
 	gtk_box_pack_start(GTK_BOX(hbox), vbox2, FALSE, FALSE, 0);
 	gtk_widget_show(vbox2);
 

@@ -55,10 +55,12 @@
 #include "gtkstatusbox.h"
 #include "gtkscrollbook.h"
 #include "gtksmiley-manager.h"
+#include "gtkstyle.h"
 #include "gtkblist-theme.h"
 #include "gtkblist-theme-loader.h"
 #include "gtkutils.h"
 #include "pidgin/minidialog.h"
+#include "pidgin/pidginabout.h"
 #include "pidgin/pidgintooltip.h"
 
 #include <gdk/gdkkeysyms.h>
@@ -183,7 +185,6 @@ typedef struct _pidgin_blist_node {
 	gint recent_signonoff_timer;
 	struct {
 		PurpleConversation *conv;
-		time_t last_message;          /* timestamp for last displayed message */
 		PidginBlistNodeFlags flags;
 	} conv;
 } PidginBlistNode;
@@ -1001,7 +1002,8 @@ make_blist_request_dialog(PidginBlistRequestData *data, PurpleAccount *account,
 	gtk_container_add(GTK_CONTAINER(gtk_dialog_get_content_area(GTK_DIALOG(data->window))),
 	                  hbox);
 	gtk_box_pack_start(GTK_BOX(hbox), img, FALSE, FALSE, 0);
-	gtk_misc_set_alignment(GTK_MISC(img), 0, 0);
+	gtk_widget_set_halign(img, GTK_ALIGN_START);
+	gtk_widget_set_valign(img, GTK_ALIGN_START);
 
 	vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 5);
 	gtk_container_add(GTK_CONTAINER(hbox), vbox);
@@ -1010,7 +1012,8 @@ make_blist_request_dialog(PidginBlistRequestData *data, PurpleAccount *account,
 
 	gtk_widget_set_size_request(label, 400, -1);
 	gtk_label_set_line_wrap(GTK_LABEL(label), TRUE);
-	gtk_misc_set_alignment(GTK_MISC(label), 0, 0);
+	gtk_label_set_xalign(GTK_LABEL(label), 0);
+	gtk_label_set_yalign(GTK_LABEL(label), 0);
 	gtk_box_pack_start(GTK_BOX(vbox), label, FALSE, FALSE, 0);
 
 	data->sg = gtk_size_group_new(GTK_SIZE_GROUP_HORIZONTAL);
@@ -1117,8 +1120,8 @@ chat_select_account_cb(GObject *w, PurpleAccount *account,
 	g_return_if_fail(data != NULL);
 	g_return_if_fail(account != NULL);
 
-	if (strcmp(purple_account_get_protocol_id(data->rq_data.account),
-	           purple_account_get_protocol_id(account)) == 0)
+	if (purple_strequal(purple_account_get_protocol_id(data->rq_data.account),
+	                    purple_account_get_protocol_id(account)))
 	{
 		data->rq_data.account = account;
 	}
@@ -1522,11 +1525,11 @@ pidgin_blist_make_buddy_menu(GtkWidget *menu, PurpleBuddy *buddy, gboolean sub) 
 
 #endif
 
-	if (protocol && PURPLE_PROTOCOL_IMPLEMENTS(protocol, XFER_IFACE, send)) {
-		if (!PURPLE_PROTOCOL_IMPLEMENTS(protocol, XFER_IFACE, can_receive) ||
-			purple_protocol_xfer_iface_can_receive(protocol,
-			purple_account_get_connection(purple_buddy_get_account(buddy)), purple_buddy_get_name(buddy)))
-		{
+	if (protocol && PURPLE_IS_PROTOCOL_XFER(protocol)) {
+		if (purple_protocol_xfer_can_receive(
+			PURPLE_PROTOCOL_XFER(protocol),
+			purple_account_get_connection(purple_buddy_get_account(buddy)), purple_buddy_get_name(buddy)
+		)) {
 			pidgin_new_menu_item(menu, _("_Send File..."),
                                         PIDGIN_STOCK_TOOLBAR_SEND_FILE,
                                         G_CALLBACK(gtk_blist_menu_send_file_cb),
@@ -1867,11 +1870,7 @@ create_buddy_menu(PurpleBlistNode *node, PurpleBuddy *b)
 }
 
 static gboolean
-pidgin_blist_show_context_menu(PurpleBlistNode *node,
-								 GtkMenuPositionFunc func,
-								 GtkWidget *tv,
-								 guint button,
-								 guint32 time)
+pidgin_blist_show_context_menu(GtkWidget *tv, PurpleBlistNode *node, GdkEvent *event)
 {
 	struct _pidgin_blist_node *gtknode = purple_blist_node_get_ui_data(node);
 	GtkWidget *menu = NULL;
@@ -1914,7 +1913,13 @@ pidgin_blist_show_context_menu(PurpleBlistNode *node,
 	/* Now display the menu */
 	if (menu != NULL) {
 		gtk_widget_show_all(menu);
-		gtk_menu_popup(GTK_MENU(menu), NULL, NULL, func, tv, button, time);
+		if (event != NULL) {
+			/* Pointer event */
+			gtk_menu_popup_at_pointer(GTK_MENU(menu), event);
+		} else {
+			/* Keyboard event */
+			pidgin_menu_popup_at_treeview_selection(menu, tv);
+		}
 		handled = TRUE;
 	}
 
@@ -1940,11 +1945,11 @@ gtk_blist_button_press_cb(GtkWidget *tv, GdkEventButton *event, gpointer user_da
 	gtknode = purple_blist_node_get_ui_data(node);
 
 	/* Right click draws a context menu */
-	if ((event->button == 3) && (event->type == GDK_BUTTON_PRESS)) {
-		handled = pidgin_blist_show_context_menu(node, NULL, tv, 3, event->time);
+	if (gdk_event_triggers_context_menu((GdkEvent *)event)) {
+		handled = pidgin_blist_show_context_menu(tv, node, (GdkEvent *)event);
 
 	/* CTRL+middle click expands or collapse a contact */
-	} else if ((event->button == 2) && (event->type == GDK_BUTTON_PRESS) &&
+	} else if ((event->button == GDK_BUTTON_MIDDLE) && (event->type == GDK_BUTTON_PRESS) &&
 			   (event->state & GDK_CONTROL_MASK) && (PURPLE_IS_CONTACT(node))) {
 		if (gtknode->contact_expanded)
 			pidgin_blist_collapse_contact_cb(NULL, node);
@@ -1953,7 +1958,7 @@ gtk_blist_button_press_cb(GtkWidget *tv, GdkEventButton *event, gpointer user_da
 		handled = TRUE;
 
 	/* Double middle click gets info */
-	} else if ((event->button == 2) && (event->type == GDK_2BUTTON_PRESS) &&
+	} else if ((event->button == GDK_BUTTON_MIDDLE) && (event->type == GDK_2BUTTON_PRESS) &&
 			   ((PURPLE_IS_CONTACT(node)) || (PURPLE_IS_BUDDY(node)))) {
 		PurpleBuddy *b;
 		if(PURPLE_IS_CONTACT(node))
@@ -2004,7 +2009,7 @@ pidgin_blist_popup_menu_cb(GtkWidget *tv, void *user_data)
 	gtk_tree_model_get(GTK_TREE_MODEL(gtkblist->treemodel), &iter, NODE_COLUMN, &node, -1);
 
 	/* Shift+F10 draws a context menu */
-	handled = pidgin_blist_show_context_menu(node, pidgin_treeview_popup_menu_position_func, tv, 0, GDK_CURRENT_TIME);
+	handled = pidgin_blist_show_context_menu(tv, node, NULL);
 
 	return handled;
 }
@@ -2081,7 +2086,7 @@ pidgin_blist_sound_method_pref_cb(const char *name, PurplePrefType type,
 {
 	gboolean sensitive = TRUE;
 
-	if(!strcmp(value, "none"))
+	if(purple_strequal(value, "none"))
 		sensitive = FALSE;
 
 	gtk_action_set_sensitive(gtk_ui_manager_get_action(gtkblist->ui, "/BList/ToolsMenu/MuteSounds"), sensitive);
@@ -2103,7 +2108,7 @@ add_buddies_from_vcard(const char *protocol_id, PurpleGroup *group, GList *list,
 		gc = (PurpleConnection *)l->data;
 		account = purple_connection_get_account(gc);
 
-		if (!strcmp(purple_account_get_protocol_id(account), protocol_id))
+		if (purple_strequal(purple_account_get_protocol_id(account), protocol_id))
 			break;
 
 		account = NULL;
@@ -2131,8 +2136,6 @@ parse_vcard(const char *vcard, PurpleGroup *group)
 	char *alias    = NULL;
 	GList *aims    = NULL;
 	GList *icqs    = NULL;
-	GList *yahoos  = NULL;
-	GList *msns    = NULL;
 	GList *jabbers = NULL;
 
 	s = temp_vcard = g_strdup(vcard);
@@ -2169,26 +2172,21 @@ parse_vcard(const char *vcard, PurpleGroup *group)
 		if (*s == '\n') *s++ = '\0';
 
 		/* We only want to worry about a few fields here. */
-		if (!strcmp(field, "FN"))
+		if (purple_strequal(field, "FN"))
 			alias = g_strdup(value);
-		else if (!strcmp(field, "X-AIM") || !strcmp(field, "X-ICQ") ||
-				 !strcmp(field, "X-YAHOO") || !strcmp(field, "X-MSN") ||
-				 !strcmp(field, "X-JABBER"))
+		else if (purple_strequal(field, "X-AIM") || purple_strequal(field, "X-ICQ") ||
+				 purple_strequal(field, "X-JABBER"))
 		{
 			char **values = g_strsplit(value, ":", 0);
 			char **im;
 
 			for (im = values; *im != NULL; im++)
 			{
-				if (!strcmp(field, "X-AIM"))
+				if (purple_strequal(field, "X-AIM"))
 					aims = g_list_append(aims, g_strdup(*im));
-				else if (!strcmp(field, "X-ICQ"))
+				else if (purple_strequal(field, "X-ICQ"))
 					icqs = g_list_append(icqs, g_strdup(*im));
-				else if (!strcmp(field, "X-YAHOO"))
-					yahoos = g_list_append(yahoos, g_strdup(*im));
-				else if (!strcmp(field, "X-MSN"))
-					msns = g_list_append(msns, g_strdup(*im));
-				else if (!strcmp(field, "X-JABBER"))
+				else if (purple_strequal(field, "X-JABBER"))
 					jabbers = g_list_append(jabbers, g_strdup(*im));
 			}
 
@@ -2198,8 +2196,7 @@ parse_vcard(const char *vcard, PurpleGroup *group)
 
 	g_free(temp_vcard);
 
-	if (aims == NULL && icqs == NULL && yahoos == NULL &&
-		msns == NULL && jabbers == NULL)
+	if (aims == NULL && icqs == NULL && jabbers == NULL)
 	{
 		g_free(alias);
 
@@ -2208,8 +2205,6 @@ parse_vcard(const char *vcard, PurpleGroup *group)
 
 	add_buddies_from_vcard("prpl-aim",    group, aims,    alias);
 	add_buddies_from_vcard("prpl-icq",    group, icqs,    alias);
-	add_buddies_from_vcard("prpl-yahoo",  group, yahoos,  alias);
-	add_buddies_from_vcard("prpl-msn",    group, msns,    alias);
 	add_buddies_from_vcard("prpl-jabber", group, jabbers, alias);
 
 	g_free(alias);
@@ -2700,7 +2695,7 @@ static GdkPixbuf *pidgin_blist_get_buddy_icon(PurpleBlistNode *node,
 
 	if (custom_img) {
 		data = purple_image_get_data(custom_img);
-		len = purple_image_get_size(custom_img);
+		len = purple_image_get_data_size(custom_img);
 	}
 
 	if (data == NULL) {
@@ -2723,7 +2718,7 @@ static GdkPixbuf *pidgin_blist_get_buddy_icon(PurpleBlistNode *node,
 			account ? purple_account_get_username(account) : "(no account)",
 			account ? purple_account_get_protocol_id(account) : "(no account)",
 			buddy ? purple_buddy_get_name(buddy) : "(no buddy)",
-			custom_img ? purple_image_get_size(custom_img) : 0);
+			custom_img ? purple_image_get_data_size(custom_img) : 0);
 		if (custom_img)
 			g_object_unref(custom_img);
 		return NULL;
@@ -3354,10 +3349,10 @@ static char *get_mood_icon_path(const char *mood)
 {
 	char *path;
 
-	if (!strcmp(mood, "busy")) {
+	if (purple_strequal(mood, "busy")) {
 		path = g_build_filename(PURPLE_DATADIR, "pixmaps", "pidgin",
 			"status", "16", "busy.png", NULL);
-	} else if (!strcmp(mood, "hiptop")) {
+	} else if (purple_strequal(mood, "hiptop")) {
 		path = g_build_filename(PURPLE_DATADIR, "pixmaps", "pidgin",
 			"emblems", "16", "hiptop.png", NULL);
 	} else {
@@ -3579,7 +3574,7 @@ set_mood_cb(GtkWidget *widget, PurpleAccount *account)
 				path, (gpointer)mood->mood);
 		g_free(path);
 
-		if (current_mood && !strcmp(current_mood, mood->mood))
+		if (current_mood && purple_strequal(current_mood, mood->mood))
 			purple_request_field_list_add_selected(f, _(mood->description));
 	}
 	purple_request_field_group_add_field(g, f);
@@ -3613,6 +3608,15 @@ set_mood_show(void)
 /***************************************************
  *            Crap                                 *
  ***************************************************/
+static void
+_pidgin_about_cb(GtkAction *action, GtkWidget *window) {
+	GtkWidget *about = pidgin_about_dialog_new();
+
+	gtk_window_set_transient_for(GTK_WINDOW(about), GTK_WINDOW(window));
+
+	gtk_widget_show_all(about);
+}
+
 /* TODO: fill out tooltips... */
 static const GtkActionEntry blist_menu_entries[] = {
 /* NOTE: Do not set any accelerator to Control+O. It is mapped by
@@ -3650,12 +3654,9 @@ static const GtkActionEntry blist_menu_entries[] = {
 	/* Help */
 	{ "HelpMenu", NULL, N_("_Help"), NULL, NULL, NULL },
 	{ "OnlineHelp", GTK_STOCK_HELP, N_("Online _Help"), "F1", NULL, gtk_blist_show_onlinehelp_cb },
-	{ "BuildInformation", NULL, N_("_Build Information"), NULL, NULL, pidgin_dialogs_buildinfo },
 	{ "DebugWindow", NULL, N_("_Debug Window"), NULL, NULL, toggle_debug },
-	{ "DeveloperInformation", NULL, N_("De_veloper Information"), NULL, NULL, pidgin_dialogs_developers },
 	{ "PluginInformation", NULL, N_("_Plugin Information"), NULL, NULL, pidgin_dialogs_plugins_info },
-	{ "TranslatorInformation", NULL, N_("_Translator Information"), NULL, NULL, pidgin_dialogs_translators },
-	{ "About", GTK_STOCK_ABOUT, N_("_About"), NULL, NULL, pidgin_dialogs_about },
+	{ "About", GTK_STOCK_ABOUT, N_("_About"), NULL, NULL, _pidgin_about_cb },
 };
 
 /* Toggle items */
@@ -3717,11 +3718,8 @@ static const char *blist_menu =
 		"<menu action='HelpMenu'>"
 			"<menuitem action='OnlineHelp'/>"
 			"<separator/>"
-			"<menuitem action='BuildInformation'/>"
 			"<menuitem action='DebugWindow'/>"
-			"<menuitem action='DeveloperInformation'/>"
 			"<menuitem action='PluginInformation'/>"
-			"<menuitem action='TranslatorInformation'/>"
 			"<separator/>"
 			"<menuitem action='About'/>"
 		"</menu>"
@@ -3854,7 +3852,7 @@ static char *pidgin_get_tooltip_text(PurpleBlistNode *node, gboolean full)
 		g_object_get(c, "alias", &alias, NULL);
 		if (full && c && purple_buddy_get_local_alias(b) != NULL && purple_buddy_get_local_alias(b)[0] != '\0' &&
 		    (alias != NULL && alias[0] != '\0') &&
-		    strcmp(alias, purple_buddy_get_local_alias(b)) != 0)
+		    !purple_strequal(alias, purple_buddy_get_local_alias(b)))
 		{
 			purple_notify_user_info_add_pair_plaintext(user_info,
 					_("Buddy Alias"), purple_buddy_get_local_alias(b));
@@ -3862,7 +3860,7 @@ static char *pidgin_get_tooltip_text(PurpleBlistNode *node, gboolean full)
 
 		/* Nickname/Server Alias */
 		/* I'd like to only show this if there's a contact or buddy
-		 * alias, but many people on MSN set long nicknames, which
+		 * alias, but people often set long nicknames, which
 		 * get ellipsized, so the only way to see the whole thing is
 		 * to look at the tooltip. */
 		if (full && purple_buddy_get_server_alias(b))
@@ -4086,15 +4084,13 @@ pidgin_blist_get_emblem(PurpleBlistNode *node)
 
 	tune = purple_presence_get_status(p, "tune");
 	if (tune && purple_status_is_active(tune)) {
-		/* Only in MSN.
-		 * TODO: Replace "Tune" with generalized "Media" in 3.0. */
+		/* TODO: Replace "Tune" with generalized "Media" in 3.0. */
 		if (purple_status_get_attr_string(tune, "game") != NULL) {
 			path = g_build_filename(PURPLE_DATADIR, "pixmaps",
 				"pidgin", "emblems", "16", "game.png", NULL);
 			return _pidgin_blist_get_cached_emblem(path);
 		}
-		/* Only in MSN.
-		 * TODO: Replace "Tune" with generalized "Media" in 3.0. */
+		/* TODO: Replace "Tune" with generalized "Media" in 3.0. */
 		if (purple_status_get_attr_string(tune, "office") != NULL) {
 			path = g_build_filename(PURPLE_DATADIR, "pixmaps",
 				"pidgin", "emblems", "16", "office.png", NULL);
@@ -4256,7 +4252,7 @@ theme_font_get_face_default(PidginThemeFont *font, const char *def)
 gchar *
 pidgin_blist_get_name_markup(PurpleBuddy *b, gboolean selected, gboolean aliased)
 {
-	const char *name, *name_color, *name_font, *status_color, *status_font;
+	const char *name, *name_color, *name_font, *status_color, *status_font, *dim_grey;
 	char *text = NULL;
 	PurpleProtocol *protocol = NULL;
 	PurpleContact *contact;
@@ -4359,13 +4355,15 @@ pidgin_blist_get_name_markup(PurpleBuddy *b, gboolean selected, gboolean aliased
 	theme = pidgin_blist_get_theme();
 	name_color = NULL;
 
+	dim_grey = pidgin_style_is_dark(NULL) ? "light slate grey" : "dim grey";
+
 	if (theme) {
 		if (purple_presence_is_idle(presence)) {
 			namefont = statusfont = pidgin_blist_theme_get_idle_text_info(theme);
-			name_color = "dim grey";
+			name_color = dim_grey;
 		} else if (!purple_presence_is_online(presence)) {
 			namefont = pidgin_blist_theme_get_offline_text_info(theme);
-			name_color = "dim grey";
+			name_color = dim_grey;
 			statusfont = pidgin_blist_theme_get_status_text_info(theme);
 		} else if (purple_presence_is_available(presence)) {
 			namefont = pidgin_blist_theme_get_online_text_info(theme);
@@ -4379,14 +4377,14 @@ pidgin_blist_get_name_markup(PurpleBuddy *b, gboolean selected, gboolean aliased
 				&& (purple_presence_is_idle(presence)
 							|| !purple_presence_is_online(presence)))
 		{
-			name_color = "dim grey";
+			name_color = dim_grey;
 		}
 	}
 
 	name_color = theme_font_get_color_default(namefont, name_color);
 	name_font = theme_font_get_face_default(namefont, "");
 
-	status_color = theme_font_get_color_default(statusfont, "dim grey");
+	status_color = theme_font_get_color_default(statusfont, dim_grey);
 	status_font = theme_font_get_face_default(statusfont, "");
 
 	if (aliased && selected) {
@@ -4598,7 +4596,7 @@ plugin_changed_cb(PurplePlugin *p, gpointer data)
 }
 
 static void
-unseen_conv_menu(void)
+unseen_conv_menu(GdkEvent *event)
 {
 	static GtkWidget *menu = NULL;
 	GList *convs = NULL;
@@ -4629,8 +4627,7 @@ unseen_conv_menu(void)
 	pidgin_conversations_fill_menu(menu, convs);
 	g_list_free(convs);
 	gtk_widget_show_all(menu);
-	gtk_menu_popup(GTK_MENU(menu), NULL, NULL, NULL, NULL, 3,
-			gtk_get_current_event_time());
+	gtk_menu_popup_at_pointer(GTK_MENU(menu), event);
 }
 
 static gboolean
@@ -4638,21 +4635,20 @@ menutray_press_cb(GtkWidget *widget, GdkEventButton *event)
 {
 	GList *convs;
 
-	switch (event->button) {
-		case 1:
-			convs = pidgin_conversations_get_unseen_ims(PIDGIN_UNSEEN_TEXT, FALSE, 1);
+	if (event->button == GDK_BUTTON_PRIMARY) {
+		convs = pidgin_conversations_get_unseen_ims(PIDGIN_UNSEEN_TEXT, FALSE, 1);
+		if(!convs)
+			convs = pidgin_conversations_get_unseen_chats(PIDGIN_UNSEEN_NICK, FALSE, 1);
 
-			if(!convs)
-				convs = pidgin_conversations_get_unseen_chats(PIDGIN_UNSEEN_NICK, FALSE, 1);
-			if (convs) {
-				pidgin_conv_present_conversation((PurpleConversation*)convs->data);
-				g_list_free(convs);
-			}
-			break;
-		case 3:
-			unseen_conv_menu();
-			break;
+		if (convs) {
+			pidgin_conv_present_conversation((PurpleConversation*)convs->data);
+			g_list_free(convs);
+		}
+
+	} else if (gdk_event_triggers_context_menu((GdkEvent *)event)) {
+		unseen_conv_menu((GdkEvent *)event);
 	}
+
 	return TRUE;
 }
 
@@ -4742,7 +4738,6 @@ conversation_deleted_update_ui_cb(PurpleConversation *conv, struct _pidgin_blist
 		return;
 	ui->conv.conv = NULL;
 	ui->conv.flags = 0;
-	ui->conv.last_message = 0;
 }
 
 static void
@@ -4763,7 +4758,6 @@ written_msg_update_ui_cb(PurpleConversation *conv, PurpleMessage *msg, PurpleBli
 	if (PURPLE_IS_CHAT_CONVERSATION(conv) && (purple_message_get_flags(msg) & PURPLE_MESSAGE_NICK))
 		ui->conv.flags |= PIDGIN_BLIST_CHAT_HAS_PENDING_MESSAGE_WITH_NICK;
 
-	ui->conv.last_message = time(NULL);    /* XXX: for lack of better data */
 	pidgin_blist_update(purple_blist_get_buddy_list(), node);
 }
 
@@ -4793,7 +4787,6 @@ conversation_created_cb(PurpleConversation *conv, PidginBuddyList *gtkblist)
 				continue;
 			ui->conv.conv = conv;
 			ui->conv.flags = 0;
-			ui->conv.last_message = 0;
 			purple_signal_connect(purple_conversations_get_handle(), "deleting-conversation",
 					ui, PURPLE_CALLBACK(conversation_deleted_update_ui_cb), ui);
 			purple_signal_connect(purple_conversations_get_handle(), "wrote-im-msg",
@@ -4811,7 +4804,6 @@ conversation_created_cb(PurpleConversation *conv, PidginBuddyList *gtkblist)
 			return;
 		ui->conv.conv = conv;
 		ui->conv.flags = 0;
-		ui->conv.last_message = 0;
 		purple_signal_connect(purple_conversations_get_handle(), "deleting-conversation",
 				ui, PURPLE_CALLBACK(conversation_deleted_update_ui_cb), ui);
 		purple_signal_connect(purple_conversations_get_handle(), "wrote-chat-msg",
@@ -4959,7 +4951,7 @@ static void _prefs_change_redo_list(const char *name, PurplePrefType type,
 static void _prefs_change_sort_method(const char *pref_name, PurplePrefType type,
 									  gconstpointer val, gpointer data)
 {
-	if(!strcmp(pref_name, PIDGIN_PREFS_ROOT "/blist/sort_type"))
+	if(purple_strequal(pref_name, PIDGIN_PREFS_ROOT "/blist/sort_type"))
 		pidgin_blist_sort_method_set(val);
 }
 
@@ -4971,6 +4963,8 @@ static gboolean pidgin_blist_select_notebook_page_cb(gpointer user_data)
 	PidginBuddyListPrivate *priv;
 
 	priv = PIDGIN_BUDDY_LIST_GET_PRIVATE(gtkblist);
+
+	priv->select_notebook_page_timeout = 0;
 
 	/* this is far too ugly thanks to me not wanting to fix #3989 properly right now */
 	if (priv->error_scrollbook != NULL) {
@@ -4989,7 +4983,7 @@ static gboolean pidgin_blist_select_notebook_page_cb(gpointer user_data)
 static void pidgin_blist_select_notebook_page(PidginBuddyList *gtkblist)
 {
 	PidginBuddyListPrivate *priv = PIDGIN_BUDDY_LIST_GET_PRIVATE(gtkblist);
-	priv->select_notebook_page_timeout = purple_timeout_add(0,
+	priv->select_notebook_page_timeout = g_timeout_add(0,
 		pidgin_blist_select_notebook_page_cb, gtkblist);
 }
 
@@ -5070,8 +5064,10 @@ headline_response_cb(GtkInfoBar *infobar, int resp, PidginBuddyList *gtkblist)
 static void
 headline_realize_cb(GtkWidget *widget, gpointer data)
 {
-	GdkCursor *hand_cursor = gdk_cursor_new(GDK_HAND2);
-	gdk_window_set_cursor(gtk_widget_get_window(widget), hand_cursor);
+	GdkWindow *window = gtk_widget_get_window(widget);
+	GdkDisplay *display = gdk_window_get_display(window);
+	GdkCursor *hand_cursor = gdk_cursor_new_for_display(display, GDK_HAND2);
+	gdk_window_set_cursor(window, hand_cursor);
 	g_object_unref(hand_cursor);
 }
 
@@ -5372,7 +5368,8 @@ create_account_label(PurpleAccount *account)
 	markup = g_strdup_printf("<span size=\"smaller\">%s</span>", username);
 	gtk_label_set_markup(GTK_LABEL(label), markup);
 	g_free(markup);
-	gtk_misc_set_alignment(GTK_MISC(label), 0, 0);
+	gtk_label_set_xalign(GTK_LABEL(label), 0);
+	gtk_label_set_yalign(GTK_LABEL(label), 0);
 	g_object_set(G_OBJECT(label), "ellipsize", PANGO_ELLIPSIZE_END, NULL);
 	description = purple_account_get_current_error(account)->description;
 	if (description != NULL && *description != '\0')
@@ -5461,7 +5458,7 @@ update_account_error_state(PurpleAccount *account,
 
 	/* else, new and old are both non-NULL */
 
-	descriptions_differ = strcmp(old->description, new->description);
+	descriptions_differ = !purple_strequal(old->description, new->description);
 	desc = new->description;
 
 	switch (new->type) {
@@ -5509,8 +5506,7 @@ show_initial_account_errors(PidginBuddyList *gtkblist)
  * I'm sure other things in this code assumes that also.
  */
 static void
-treeview_style_set (GtkWidget *widget,
-		    GtkStyle *prev_style,
+treeview_style_set(GtkWidget *widget,
 		    gpointer data)
 {
 	PurpleBuddyList *list = data;
@@ -5552,14 +5548,14 @@ kiosk_page()
 
 	label = gtk_label_new(NULL);
 	gtk_label_set_markup(GTK_LABEL(label), _("<b>Username:</b>"));
-	gtk_misc_set_alignment(GTK_MISC(label), 0.0, 0.5);
+	gtk_label_set_xalign(GTK_LABEL(label), 0.0);
 	gtk_box_pack_start(GTK_BOX(ret), label, FALSE, FALSE, 0);
 	entry = gtk_entry_new();
 	gtk_box_pack_start(GTK_BOX(ret), entry, FALSE, FALSE, 0);
 
 	label = gtk_label_new(NULL);
 	gtk_label_set_markup(GTK_LABEL(label), _("<b>Password:</b>"));
-	gtk_misc_set_alignment(GTK_MISC(label), 0.0, 0.5);
+	gtk_label_set_xalign(GTK_LABEL(label), 0.0);
 	gtk_box_pack_start(GTK_BOX(ret), label, FALSE, FALSE, 0);
 	entry = gtk_entry_new();
 	gtk_entry_set_visibility(GTK_ENTRY(entry), FALSE);
@@ -5614,7 +5610,7 @@ pidgin_blist_build_layout(PurpleBuddyList *list)
 					    "visible", GROUP_EXPANDER_VISIBLE_COLUMN,
 					    "expander-visible", GROUP_EXPANDER_COLUMN,
 					    "sensitive", GROUP_EXPANDER_COLUMN,
-					    "cell-background-gdk", BGCOLOR_COLUMN,
+					    "cell-background-rgba", BGCOLOR_COLUMN,
 					    NULL);
 
 	/* contact */
@@ -5624,7 +5620,7 @@ pidgin_blist_build_layout(PurpleBuddyList *list)
 					    "visible", CONTACT_EXPANDER_VISIBLE_COLUMN,
 					    "expander-visible", CONTACT_EXPANDER_COLUMN,
 					    "sensitive", CONTACT_EXPANDER_COLUMN,
-					    "cell-background-gdk", BGCOLOR_COLUMN,
+					    "cell-background-rgba", BGCOLOR_COLUMN,
 					    NULL);
 
 	for (i = 0; i < 5; i++) {
@@ -5636,7 +5632,7 @@ pidgin_blist_build_layout(PurpleBuddyList *list)
 			gtk_tree_view_column_set_attributes(column, rend,
 							    "pixbuf", STATUS_ICON_COLUMN,
 							    "visible", STATUS_ICON_VISIBLE_COLUMN,
-							    "cell-background-gdk", BGCOLOR_COLUMN,
+							    "cell-background-rgba", BGCOLOR_COLUMN,
 							    NULL);
 			g_object_set(rend, "xalign", 0.0, "xpad", 6, "ypad", 0, NULL);
 
@@ -5645,7 +5641,7 @@ pidgin_blist_build_layout(PurpleBuddyList *list)
 			gtkblist->text_rend = rend = gtk_cell_renderer_text_new();
 			gtk_tree_view_column_pack_start(column, rend, TRUE);
 			gtk_tree_view_column_set_attributes(column, rend,
-							    "cell-background-gdk", BGCOLOR_COLUMN,
+							    "cell-background-rgba", BGCOLOR_COLUMN,
 							    "markup", NAME_COLUMN,
 							    NULL);
 			g_signal_connect(G_OBJECT(rend), "editing-started", G_CALLBACK(gtk_blist_renderer_editing_started_cb), NULL);
@@ -5661,7 +5657,7 @@ pidgin_blist_build_layout(PurpleBuddyList *list)
 			gtk_tree_view_column_set_attributes(column, rend,
 							    "markup", IDLE_COLUMN,
 							    "visible", IDLE_VISIBLE_COLUMN,
-							    "cell-background-gdk", BGCOLOR_COLUMN,
+							    "cell-background-rgba", BGCOLOR_COLUMN,
 							    NULL);
 		} else if (emblem == i) {
 			/* emblem */
@@ -5669,7 +5665,7 @@ pidgin_blist_build_layout(PurpleBuddyList *list)
 			g_object_set(rend, "xalign", 1.0, "yalign", 0.5, "ypad", 0, "xpad", 3, NULL);
 			gtk_tree_view_column_pack_start(column, rend, FALSE);
 			gtk_tree_view_column_set_attributes(column, rend, "pixbuf", EMBLEM_COLUMN,
-									  "cell-background-gdk", BGCOLOR_COLUMN,
+									  "cell-background-rgba", BGCOLOR_COLUMN,
 									  "visible", EMBLEM_VISIBLE_COLUMN, NULL);
 
 		} else if (protocol_icon == i) {
@@ -5679,7 +5675,7 @@ pidgin_blist_build_layout(PurpleBuddyList *list)
 			gtk_tree_view_column_set_attributes(column, rend,
 							   "pixbuf", PROTOCOL_ICON_COLUMN,
 							   "visible", PROTOCOL_ICON_VISIBLE_COLUMN,
-							   "cell-background-gdk", BGCOLOR_COLUMN,
+							   "cell-background-rgba", BGCOLOR_COLUMN,
 							  NULL);
 			g_object_set(rend, "xalign", 0.0, "xpad", 3, "ypad", 0, NULL);
 
@@ -5689,7 +5685,7 @@ pidgin_blist_build_layout(PurpleBuddyList *list)
 			g_object_set(rend, "xalign", 1.0, "ypad", 0, NULL);
 			gtk_tree_view_column_pack_start(column, rend, FALSE);
 			gtk_tree_view_column_set_attributes(column, rend, "pixbuf", BUDDY_ICON_COLUMN,
-							    "cell-background-gdk", BGCOLOR_COLUMN,
+							    "cell-background-rgba", BGCOLOR_COLUMN,
 							    "visible", BUDDY_ICON_VISIBLE_COLUMN,
 							    NULL);
 		}
@@ -5866,7 +5862,7 @@ static void pidgin_blist_show(PurpleBuddyList *list)
 	g_free(tmp);
 	label = gtk_label_new(NULL);
 	gtk_label_set_line_wrap(GTK_LABEL(label), TRUE);
-	gtk_misc_set_alignment(GTK_MISC(label), 0.5, 0.2);
+	gtk_label_set_yalign(GTK_LABEL(label), 0.2);
 	gtk_label_set_markup(GTK_LABEL(label), pretty);
 	g_free(pretty);
 	gtk_notebook_append_page(GTK_NOTEBOOK(gtkblist->notebook),label, NULL);
@@ -5887,7 +5883,8 @@ static void pidgin_blist_show(PurpleBuddyList *list)
 
 	content_area = gtk_info_bar_get_content_area(GTK_INFO_BAR(infobar));
 	gtkblist->headline_image = gtk_image_new_from_pixbuf(NULL);
-	gtk_misc_set_alignment(GTK_MISC(gtkblist->headline_image), 0.5, 0.5);
+	gtk_widget_set_halign(gtkblist->headline_image, GTK_ALIGN_CENTER);
+	gtk_widget_set_valign(gtkblist->headline_image, GTK_ALIGN_CENTER);
 	gtkblist->headline_label = gtk_label_new(NULL);
 	gtk_label_set_line_wrap(GTK_LABEL(gtkblist->headline_label), TRUE);
 	gtk_box_pack_start(GTK_BOX(content_area), gtkblist->headline_image,
@@ -5920,7 +5917,7 @@ static void pidgin_blist_show(PurpleBuddyList *list)
 						 GDK_TYPE_PIXBUF, /* Buddy icon */
 						 G_TYPE_BOOLEAN,  /* Buddy icon visible */
 						 G_TYPE_POINTER,  /* Node */
-						 GDK_TYPE_COLOR,  /* bgcolor */
+						 GDK_TYPE_RGBA,   /* bgcolor */
 						 G_TYPE_BOOLEAN,  /* Group expander */
 						 G_TYPE_BOOLEAN,  /* Group expander visible */
 						 G_TYPE_BOOLEAN,  /* Contact expander */
@@ -5937,7 +5934,7 @@ static void pidgin_blist_show(PurpleBuddyList *list)
 	gtk_widget_set_name(gtkblist->treeview, "pidgin_blist_treeview");
 
 	g_signal_connect(gtkblist->treeview,
-			 "style-set",
+			 "style-updated",
 			 G_CALLBACK(treeview_style_set), list);
 	/* Set up selection stuff */
 	selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(gtkblist->treeview));
@@ -5990,8 +5987,8 @@ static void pidgin_blist_show(PurpleBuddyList *list)
 	gtk_tree_view_set_search_equal_func(GTK_TREE_VIEW(gtkblist->treeview),
 			pidgin_blist_search_equal_func, NULL, NULL);
 
-	gtk_box_pack_start(GTK_BOX(gtkblist->vbox), 
-		pidgin_make_scrollable(gtkblist->treeview, GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC, GTK_SHADOW_NONE, -1, -1), 
+	gtk_box_pack_start(GTK_BOX(gtkblist->vbox),
+		pidgin_make_scrollable(gtkblist->treeview, GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC, GTK_SHADOW_NONE, -1, -1),
 		TRUE, TRUE, 0);
 
 	sep = gtk_separator_new(GTK_ORIENTATION_HORIZONTAL);
@@ -6031,7 +6028,7 @@ static void pidgin_blist_show(PurpleBuddyList *list)
 	gtk_toggle_action_set_active(GTK_TOGGLE_ACTION(gtk_ui_manager_get_action(gtkblist->ui, "/BList/BuddiesMenu/ShowMenu/ShowProtocolIcons")),
 			purple_prefs_get_bool(PIDGIN_PREFS_ROOT "/blist/show_protocol_icons"));
 
-	if(!strcmp(purple_prefs_get_string(PIDGIN_PREFS_ROOT "/sound/method"), "none"))
+	if(purple_strequal(purple_prefs_get_string(PIDGIN_PREFS_ROOT "/sound/method"), "none"))
 		gtk_action_set_sensitive(gtk_ui_manager_get_action(gtkblist->ui, "/BList/ToolsMenu/MuteSounds"), FALSE);
 
 	/* Update some dynamic things */
@@ -6047,7 +6044,7 @@ static void pidgin_blist_show(PurpleBuddyList *list)
 	purple_blist_set_visible(purple_prefs_get_bool(PIDGIN_PREFS_ROOT "/blist/list_visible"));
 
 	/* start the refresh timer */
-	gtkblist->refresh_timer = purple_timeout_add_seconds(30, (GSourceFunc)pidgin_blist_refresh_timer, list);
+	gtkblist->refresh_timer = g_timeout_add_seconds(30, (GSourceFunc)pidgin_blist_refresh_timer, list);
 
 	handle = pidgin_blist_get_handle();
 
@@ -6170,7 +6167,7 @@ pidgin_blist_update_refresh_timeout()
 	blist = purple_blist_get_buddy_list();
 	gtkblist = PIDGIN_BLIST(purple_blist_get_buddy_list());
 
-	gtkblist->refresh_timer = purple_timeout_add_seconds(30,(GSourceFunc)pidgin_blist_refresh_timer, blist);
+	gtkblist->refresh_timer = g_timeout_add_seconds(30,(GSourceFunc)pidgin_blist_refresh_timer, blist);
 }
 
 static gboolean get_iter_from_node(PurpleBlistNode *node, GtkTreeIter *iter) {
@@ -6223,7 +6220,7 @@ static void pidgin_blist_remove(PurpleBuddyList *list, PurpleBlistNode *node)
 
 	if(gtknode) {
 		if(gtknode->recent_signonoff_timer > 0)
-			purple_timeout_remove(gtknode->recent_signonoff_timer);
+			g_source_remove(gtknode->recent_signonoff_timer);
 
 		purple_signals_disconnect_by_handle(gtknode);
 		g_free(gtknode);
@@ -6399,7 +6396,7 @@ static void pidgin_blist_update_group(PurpleBuddyList *list,
 		GtkTreeIter iter;
 		GtkTreePath *path;
 		gboolean expanded;
-		GdkColor *bgcolor = NULL;
+		GdkRGBA *bgcolor = NULL;
 		GdkPixbuf *avatar = NULL;
 		PidginBlistTheme *theme = NULL;
 
@@ -6506,7 +6503,7 @@ static void buddy_node(PurpleBuddy *buddy, GtkTreeIter *iter, PurpleBlistNode *n
 {
 	PurplePresence *presence = purple_buddy_get_presence(buddy);
 	GdkPixbuf *status, *avatar, *emblem, *protocol_icon;
-	GdkColor *color = NULL;
+	GdkRGBA *color = NULL;
 	char *mark;
 	char *idle = NULL;
 	gboolean expanded = ((struct _pidgin_blist_node *)purple_blist_node_get_ui_data(node->parent))->contact_expanded;
@@ -6560,7 +6557,7 @@ static void buddy_node(PurpleBuddy *buddy, GtkTreeIter *iter, PurpleBlistNode *n
 				textcolor = pidgin_theme_font_get_color_describe(pair);
 			else
 				/* If no theme them default to making idle buddy names grey */
-				textcolor = "dim grey";
+				textcolor = pidgin_style_is_dark(NULL) ? "light slate grey" : "dim grey";
 
 			if (textcolor) {
 				idle = g_strdup_printf("<span color='%s' font_desc='%s'>%d:%02d</span>",
@@ -6651,7 +6648,7 @@ static void pidgin_blist_update_contact(PurpleBuddyList *list, PurpleBlistNode *
 			GdkPixbuf *status;
 			gchar *mark, *tmp;
 			const gchar *fg_color, *font;
-			GdkColor *color = NULL;
+			GdkRGBA *color = NULL;
 			PidginBlistTheme *theme;
 			PidginThemeFont *pair;
 			gboolean selected = (gtkblist->selected_node == cnode);
@@ -6763,7 +6760,7 @@ static void pidgin_blist_update_chat(PurpleBuddyList *list, PurpleBlistNode *nod
 		PidginBlistNode *ui;
 		PurpleConversation *conv;
 		gboolean hidden = FALSE;
-		GdkColor *bgcolor = NULL;
+		GdkRGBA *bgcolor = NULL;
 		PidginThemeFont *pair;
 		PidginBlistTheme *theme;
 		gboolean selected = (gtkblist->selected_node == node);
@@ -6887,7 +6884,7 @@ static void pidgin_blist_destroy(PurpleBuddyList *list)
 	pidgin_blist_tooltip_destroy();
 
 	if (gtkblist->refresh_timer)
-		purple_timeout_remove(gtkblist->refresh_timer);
+		g_source_remove(gtkblist->refresh_timer);
 	if (gtkblist->timeout)
 		g_source_remove(gtkblist->timeout);
 	if (gtkblist->drag_timeout)
@@ -6907,7 +6904,7 @@ static void pidgin_blist_destroy(PurpleBuddyList *list)
 	if (priv->current_theme)
 		g_object_unref(priv->current_theme);
 	if (priv->select_notebook_page_timeout)
-		purple_timeout_remove(priv->select_notebook_page_timeout);
+		g_source_remove(priv->select_notebook_page_timeout);
 	g_free(priv);
 
 	g_free(gtkblist);
@@ -7303,8 +7300,8 @@ pidgin_blist_request_add_chat(PurpleAccount *account, PurpleGroup *group,
 	                          data->chat_data.rq_data.sg, data->group_combo,
 	                          TRUE, NULL);
 
-	data->autojoin = gtk_check_button_new_with_mnemonic(_("Auto_join when account connects."));
-	data->persistent = gtk_check_button_new_with_mnemonic(_("_Remain in chat after window is closed."));
+	data->autojoin = gtk_check_button_new_with_mnemonic(_("Automatically _join when account connects"));
+	data->persistent = gtk_check_button_new_with_mnemonic(_("_Remain in chat after window is closed"));
 	gtk_box_pack_start(GTK_BOX(vbox), data->autojoin, FALSE, FALSE, 0);
 	gtk_box_pack_start(GTK_BOX(vbox), data->persistent, FALSE, FALSE, 0);
 
@@ -7499,10 +7496,10 @@ static void buddy_signonoff_cb(PurpleBuddy *buddy)
 	gtknode->recent_signonoff = TRUE;
 
 	if(gtknode->recent_signonoff_timer > 0)
-		purple_timeout_remove(gtknode->recent_signonoff_timer);
-	
+		g_source_remove(gtknode->recent_signonoff_timer);
+
 	g_object_ref(buddy);
-	gtknode->recent_signonoff_timer = purple_timeout_add_seconds(10,
+	gtknode->recent_signonoff_timer = g_timeout_add_seconds(10,
 			(GSourceFunc)buddy_signonoff_timeout_cb, buddy);
 }
 
@@ -7637,7 +7634,7 @@ void pidgin_blist_sort_method_unreg(const char *id)
 
 	while(l) {
 		struct _PidginBlistSortMethod *method = l->data;
-		if(!strcmp(method->id, id)) {
+		if(purple_strequal(method->id, id)) {
 			pidgin_blist_sort_methods = g_list_delete_link(pidgin_blist_sort_methods, l);
 			g_free(method->id);
 			g_free(method->name);
@@ -7655,7 +7652,7 @@ void pidgin_blist_sort_method_set(const char *id){
 	if(!id)
 		id = "none";
 
-	while (l && strcmp(((struct _PidginBlistSortMethod*)l->data)->id, id))
+	while (l && !purple_strequal(((struct _PidginBlistSortMethod*)l->data)->id, id))
 		l = l->next;
 
 	if (l) {
@@ -7664,7 +7661,7 @@ void pidgin_blist_sort_method_set(const char *id){
 		pidgin_blist_sort_method_set("none");
 		return;
 	}
-	if (!strcmp(id, "none")) {
+	if (purple_strequal(id, "none")) {
 		redo_buddy_list(purple_blist_get_buddy_list(), TRUE, FALSE);
 	} else {
 		redo_buddy_list(purple_blist_get_buddy_list(), FALSE, FALSE);
@@ -8310,7 +8307,7 @@ pidgin_blist_update_sort_methods(void)
 		gtk_radio_action_set_group(action, sl);
 		sl = gtk_radio_action_get_group(action);
 
-		if (!strcmp(m, method->id))
+		if (purple_strequal(m, method->id))
 			gtk_toggle_action_set_active(GTK_TOGGLE_ACTION(action), TRUE);
 		else
 			gtk_toggle_action_set_active(GTK_TOGGLE_ACTION(action), FALSE);

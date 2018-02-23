@@ -35,6 +35,10 @@
 #include <farstream/fs-utils.h>
 #include <gst/gststructure.h>
 
+#if !GST_CHECK_VERSION(1,0,0)
+#define gst_registry_get() gst_registry_get_default()
+#endif
+
 /** @copydoc _PurpleMediaBackendFs2Class */
 typedef struct _PurpleMediaBackendFs2Class PurpleMediaBackendFs2Class;
 /** @copydoc _PurpleMediaBackendFs2Private */
@@ -836,8 +840,8 @@ get_stream(PurpleMediaBackendFs2 *self,
 
 	for (; streams; streams = g_list_next(streams)) {
 		PurpleMediaBackendFs2Stream *stream = streams->data;
-		if (!strcmp(stream->session->id, sess_id) &&
-				!strcmp(stream->participant, name))
+		if (purple_strequal(stream->session->id, sess_id) &&
+				purple_strequal(stream->participant, name))
 			return stream;
 	}
 
@@ -859,9 +863,9 @@ get_streams(PurpleMediaBackendFs2 *self,
 	for (; streams; streams = g_list_next(streams)) {
 		PurpleMediaBackendFs2Stream *stream = streams->data;
 
-		if (sess_id != NULL && strcmp(stream->session->id, sess_id))
+		if (sess_id != NULL && !purple_strequal(stream->session->id, sess_id))
 			continue;
-		else if (name != NULL && strcmp(stream->participant, name))
+		else if (name != NULL && !purple_strequal(stream->participant, name))
 			continue;
 		else
 			ret = g_list_prepend(ret, stream);
@@ -1055,7 +1059,7 @@ gst_handle_message_element(GstBus *bus, GstMessage *msg,
 		FsParticipant *participant;
 		PurpleMediaBackendFs2Session *session;
 		PurpleMediaBackendFs2Stream *media_stream;
-		gchar *name;
+		const gchar *name;
 
 		value = gst_structure_get_value(structure, "stream");
 		stream = g_value_get_object(value);
@@ -1069,8 +1073,7 @@ gst_handle_message_element(GstBus *bus, GstMessage *msg,
 				local_candidate->foundation);
 
 		g_object_get(stream, "participant", &participant, NULL);
-		g_object_get(participant, "cname", &name, NULL);
-		g_object_unref(participant);
+		name = g_object_get_data(G_OBJECT(participant), "purple-name");
 
 		media_stream = get_stream(self, session->id, name);
 		media_stream->local_candidates = g_list_append(
@@ -1081,24 +1084,25 @@ gst_handle_message_element(GstBus *bus, GstMessage *msg,
 		g_signal_emit_by_name(self, "new-candidate",
 				session->id, name, candidate);
 		g_object_unref(candidate);
+		g_object_unref(participant);
 	} else if (gst_structure_has_name(structure,
 			"farstream-local-candidates-prepared")) {
 		const GValue *value;
 		FsStream *stream;
 		FsParticipant *participant;
 		PurpleMediaBackendFs2Session *session;
-		gchar *name;
 
 		value = gst_structure_get_value(structure, "stream");
 		stream = g_value_get_object(value);
 		session = get_session_from_fs_stream(self, stream);
 
 		g_object_get(stream, "participant", &participant, NULL);
-		g_object_get(participant, "cname", &name, NULL);
-		g_object_unref(participant);
 
 		g_signal_emit_by_name(self, "candidates-prepared",
-				session->id, name);
+				session->id,
+				g_object_get_data(G_OBJECT(participant), "purple-name"));
+
+		g_object_unref(participant);
 	} else if (gst_structure_has_name(structure,
 			"farstream-new-active-candidate-pair")) {
 		const GValue *value;
@@ -1108,7 +1112,6 @@ gst_handle_message_element(GstBus *bus, GstMessage *msg,
 		FsParticipant *participant;
 		PurpleMediaBackendFs2Session *session;
 		PurpleMediaCandidate *lcandidate, *rcandidate;
-		gchar *name;
 
 		value = gst_structure_get_value(structure, "stream");
 		stream = g_value_get_object(value);
@@ -1118,8 +1121,6 @@ gst_handle_message_element(GstBus *bus, GstMessage *msg,
 		remote_candidate = g_value_get_boxed(value);
 
 		g_object_get(stream, "participant", &participant, NULL);
-		g_object_get(participant, "cname", &name, NULL);
-		g_object_unref(participant);
 
 		session = get_session_from_fs_stream(self, stream);
 
@@ -1127,8 +1128,11 @@ gst_handle_message_element(GstBus *bus, GstMessage *msg,
 		rcandidate = candidate_from_fs(remote_candidate);
 
 		g_signal_emit_by_name(self, "active-candidate-pair",
-				session->id, name, lcandidate, rcandidate);
+				session->id,
+				g_object_get_data(G_OBJECT(participant), "purple-name"),
+				lcandidate, rcandidate);
 
+		g_object_unref(participant);
 		g_object_unref(lcandidate);
 		g_object_unref(rcandidate);
 	} else if (gst_structure_has_name(structure,
@@ -1720,7 +1724,7 @@ create_session(PurpleMediaBackendFs2 *self, const gchar *sess_id,
 	 * receiving the src-pad-added signal.
 	 * Only works for non-multicast FsRtpSessions.
 	 */
-	if (!!strcmp(transmitter, "multicast"))
+	if (!purple_strequal(transmitter, "multicast"))
 		g_object_set(G_OBJECT(session->session),
 				"no-rtcp-timeout", 0, NULL);
 
@@ -1770,6 +1774,9 @@ create_participant(PurpleMediaBackendFs2 *self, const gchar *name)
 		g_error_free(err);
 		return FALSE;
 	}
+
+	g_object_set_data_full(G_OBJECT(participant), "purple-name",
+			g_strdup(name), g_free);
 
 	if (g_object_class_find_property(G_OBJECT_GET_CLASS(participant),
 			"cname")) {
@@ -1884,7 +1891,7 @@ src_pad_added_cb(FsStream *fsstream, GstPad *srcpad,
 	gst_pad_link(srcpad, sinkpad);
 	gst_object_unref(sinkpad);
 
-	stream->connected_cb_id = purple_timeout_add(0,
+	stream->connected_cb_id = g_timeout_add(0,
 			(GSourceFunc)src_pad_added_cb_cb, stream);
 }
 
@@ -1999,7 +2006,7 @@ create_stream(PurpleMediaBackendFs2 *self,
 		++_num_params;
 	}
 
-	if (turn_ip && !strcmp("nice", transmitter) && !got_turn_from_protocol) {
+	if (turn_ip && purple_strequal("nice", transmitter) && !got_turn_from_protocol) {
 G_GNUC_BEGIN_IGNORE_DEPRECATIONS
 		GValueArray *relay_info = g_value_array_new(0);
 G_GNUC_END_IGNORE_DEPRECATIONS
@@ -2015,7 +2022,7 @@ G_GNUC_END_IGNORE_DEPRECATIONS
 			relay_info = append_relay_info(relay_info, turn_ip, port, username,
 				password, "udp");
 		}
-		
+
 		/* TCP */
 		port = purple_prefs_get_int("/purple/network/turn_port_tcp");
 		if (port > 0) {
@@ -2052,7 +2059,7 @@ G_GNUC_END_IGNORE_DEPRECATIONS
 	stream->participant = g_strdup(who);
 	stream->session = session;
 	stream->stream = fsstream;
-	stream->supports_add = !strcmp(transmitter, "nice");
+	stream->supports_add = purple_strequal(transmitter, "nice");
 
 	priv->streams =	g_list_append(priv->streams, stream);
 
@@ -2067,7 +2074,7 @@ free_stream(PurpleMediaBackendFs2Stream *stream)
 {
 	/* Remove the connected_cb timeout */
 	if (stream->connected_cb_id != 0)
-		purple_timeout_remove(stream->connected_cb_id);
+		g_source_remove(stream->connected_cb_id);
 
 	g_free(stream->participant);
 
@@ -2459,7 +2466,7 @@ param_to_sdes_type(const gchar *param)
 	guint i;
 
 	for (i = 0; supported[i] != NULL; ++i) {
-		if (!strcmp(param, supported[i])) {
+		if (purple_strequal(param, supported[i])) {
 			return sdes_types[i];
 		}
 	}
@@ -2554,7 +2561,7 @@ purple_media_backend_fs2_send_dtmf(PurpleMediaBackend *self,
 	if (duration <= 50) {
 		fs_session_stop_telephony_event(session->session);
 	} else {
-		purple_timeout_add(duration, send_dtmf_callback,
+		g_timeout_add(duration, send_dtmf_callback,
 				session->session);
 	}
 
@@ -2568,7 +2575,6 @@ purple_media_backend_fs2_get_type(void)
 }
 #endif /* USE_VV */
 
-#ifdef USE_GSTREAMER
 GstElement *
 purple_media_backend_fs2_get_src(PurpleMediaBackendFs2 *self,
 		const gchar *sess_id)
@@ -2658,7 +2664,6 @@ purple_media_backend_fs2_set_output_volume(PurpleMediaBackendFs2 *self,
 	}
 #endif /* USE_VV */
 }
-#endif /* USE_GSTREAMER */
 
 #ifdef USE_VV
 static gboolean

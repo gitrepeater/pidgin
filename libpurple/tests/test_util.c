@@ -1,3 +1,25 @@
+/*
+ * purple
+ *
+ * Purple is the legal property of its developers, whose names are too numerous
+ * to list here.  Please refer to the COPYRIGHT file distributed with this
+ * source distribution.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02111-1301  USA
+ *
+ */
 #include <glib.h>
 
 #include "../util.h"
@@ -18,24 +40,6 @@ test_util_base_16_decode(void) {
 
 	g_assert_cmpint(sz, ==, 14);
 	g_assert_cmpstr("!dlrow ,olleh", ==, (const gchar *)out);
-}
-
-/******************************************************************************
- * base 64 tests
- *****************************************************************************/
-static void
-test_util_base_64_encode(void) {
-	gchar *in = purple_base64_encode((const unsigned char *)"forty-two", 10);
-	g_assert_cmpstr("Zm9ydHktdHdvAA==", ==, in);
-}
-
-static void
-test_util_base_64_decode(void) {
-	gsize sz = 0;
-	guchar *out = purple_base64_decode("b3d0LXl0cm9mAA==", &sz);
-
-	g_assert_cmpint(sz, ==, 10);
-	g_assert_cmpstr("owt-ytrof", ==, (gchar *)out);
 }
 
 /******************************************************************************
@@ -192,6 +196,46 @@ test_util_str_to_time(void) {
 	g_assert_cmpint(1282941722, ==, timestamp);
 	g_assert_cmpint((-7 * 60 * 60), ==, tz_off);
 	g_assert_cmpstr("PDT", ==, rest);
+}
+
+/******************************************************************************
+ * str_to_date_time tests
+ *****************************************************************************/
+static void
+test_util_str_to_date_time(void)
+{
+	GDateTime *dt;
+
+	dt = purple_str_to_date_time("19811214T12:50:00", TRUE);
+	g_assert_cmpint(377182200, ==, g_date_time_to_unix(dt));
+	g_assert_cmpint(0, ==, g_date_time_get_utc_offset(dt));
+	g_date_time_unref(dt);
+
+	dt = purple_str_to_date_time("20070407T04:14:21.1234", TRUE);
+	g_assert_cmpint(1175919261, ==, g_date_time_to_unix(dt));
+	g_assert_cmpint(0, ==, g_date_time_get_utc_offset(dt));
+	g_assert_cmpint(123400, ==, g_date_time_get_microsecond(dt));
+	g_date_time_unref(dt);
+
+	dt = purple_str_to_date_time("2010-08-27.204202", TRUE);
+	g_assert_cmpint(1282941722, ==, g_date_time_to_unix(dt));
+	g_assert_cmpint(0, ==, g_date_time_get_utc_offset(dt));
+	g_date_time_unref(dt);
+
+	dt = purple_str_to_date_time("2010-08-27.204202.123456", TRUE);
+	g_assert_cmpint(1282941722, ==, g_date_time_to_unix(dt));
+	g_assert_cmpint(0, ==, g_date_time_get_utc_offset(dt));
+	g_assert_cmpint(123456, ==, g_date_time_get_microsecond(dt));
+	g_date_time_unref(dt);
+
+	dt = purple_str_to_date_time("2010-08-27.134202-0700PDT", FALSE);
+	g_assert_cmpint(1282941722, ==, g_date_time_to_unix(dt));
+	g_assert_cmpint((-7LL * 60 * 60 * G_USEC_PER_SEC), ==, g_date_time_get_utc_offset(dt));
+
+	dt = purple_str_to_date_time("2010-08-27.134202.1234-0700PDT", FALSE);
+	g_assert_cmpint(1282941722, ==, g_date_time_to_unix(dt));
+	g_assert_cmpint(123400, ==, g_date_time_get_microsecond(dt));
+	g_assert_cmpint((-7LL * 60 * 60 * G_USEC_PER_SEC), ==, g_date_time_get_utc_offset(dt));
 }
 
 /******************************************************************************
@@ -428,6 +472,10 @@ test_util_utf8_strip_unprintables(void) {
 			"aaaa\xef\xbb\xbf",
 			"aaaa\xef\xbb\xbf",
 		}, {
+			/* U+FFFE (should be stripped) */
+			"aaaa\xef\xbf\xbe",
+			"aaaa",
+		}, {
 			NULL,
 			NULL,
 		}
@@ -440,20 +488,12 @@ test_util_utf8_strip_unprintables(void) {
 
 		g_free(result);
 
+		/* NULL as input is a valid test, but it's the last test, so we break
+		 * after it.
+		 */
 		if(data[i].input == NULL)
 			break;
 	}
-
-#if 0
-	/* invalid UTF-8 */
-	/* disabled because make check fails on an assertion */
-	fail_unless(NULL == purple_utf8_strip_unprintables("abc\x80\x7f"));
-	/* disabled because make check fails on an assertion */
-	/* U+DB80 (Private Use High Surrogate, First) -- should be stripped */
-	assert_string_equal_free("aaaa", purple_utf8_strip_unprintables("aaaa\xed\xa0\x80"));
-	/* U+FFFE (should be stripped) */
-	assert_string_equal_free("aaaa", purple_utf8_strip_unprintables("aaaa\xef\xbf\xbe"));
-#endif
 }
 
 /******************************************************************************
@@ -479,6 +519,30 @@ test_util_strdup_withhtml(void) {
 }
 
 /******************************************************************************
+ * URI Escaping
+ *****************************************************************************/
+static void
+test_uri_escape_for_open(void) {
+	/* make sure shell stuff is escaped... */
+	gchar *result = purple_uri_escape_for_open("https://$(xterm)");
+	g_assert_cmpstr("https://%24%28xterm%29", ==, result);
+	g_free(result);
+
+	result = purple_uri_escape_for_open("https://`xterm`");
+	g_assert_cmpstr("https://%60xterm%60", ==, result);
+	g_free(result);
+
+	result = purple_uri_escape_for_open("https://$((25 + 13))");
+	g_assert_cmpstr("https://%24%28%2825%20+%2013%29%29", ==, result);
+	g_free(result);
+
+	/* ...but keep brackets so that ipv6 links can be opened. */
+	result = purple_uri_escape_for_open("https://[123:4567:89a::::]");
+	g_assert_cmpstr("https://[123:4567:89a::::]", ==, result);
+	g_free(result);
+}
+
+/******************************************************************************
  * MANE
  *****************************************************************************/
 gint
@@ -489,11 +553,6 @@ main(gint argc, gchar **argv) {
 	                test_util_base_16_encode);
 	g_test_add_func("/util/base/16/decode",
 	                test_util_base_16_decode);
-
-	g_test_add_func("/util/base/64/encode",
-	                test_util_base_64_encode);
-	g_test_add_func("/util/base/64/decode",
-	                test_util_base_64_decode);
 
 	g_test_add_func("/util/filename/escape",
 	                test_util_filename_escape);
@@ -516,6 +575,9 @@ main(gint argc, gchar **argv) {
 	g_test_add_func("/util/str to time",
 	                test_util_str_to_time);
 
+	g_test_add_func("/util/str to date time",
+	                test_util_str_to_date_time);
+
 	g_test_add_func("/util/markup/html to xhtml",
 	                test_util_markup_html_to_xhtml);
 
@@ -527,6 +589,9 @@ main(gint argc, gchar **argv) {
 
 	g_test_add_func("/util/test_strdup_withhtml",
 	                test_util_strdup_withhtml);
+
+	g_test_add_func("/util/test_uri_escape_for_open",
+	                test_uri_escape_for_open);
 
 	return g_test_run();
 }

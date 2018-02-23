@@ -524,8 +524,9 @@ pidgin_widget_decorate_account(GtkWidget *cont, PurpleAccount *account)
 			GTK_DIALOG(cont))), image, FALSE, TRUE, 0);
 		gtk_box_reorder_child(GTK_BOX(gtk_dialog_get_action_area(
 			GTK_DIALOG(cont))), image, 0);
-	} else if (GTK_IS_HBOX(cont)) {
-		gtk_misc_set_alignment(GTK_MISC(image), 0, 0);
+	} else if (GTK_IS_BOX(cont)) {
+		gtk_widget_set_halign(image, GTK_ALIGN_START);
+		gtk_widget_set_valign(image, GTK_ALIGN_START);
 		gtk_box_pack_end(GTK_BOX(cont), image, FALSE, TRUE, 0);
 	}
 	gtk_widget_show(image);
@@ -566,7 +567,8 @@ pidgin_notify_message(PurpleNotifyMessageType type, const char *title,
 	if (icon_name != NULL)
 	{
 		img = gtk_image_new_from_stock(icon_name, gtk_icon_size_from_name(PIDGIN_ICON_SIZE_TANGO_HUGE));
-		gtk_misc_set_alignment(GTK_MISC(img), 0, 0);
+		gtk_widget_set_halign(img, GTK_ALIGN_START);
+		gtk_widget_set_valign(img, GTK_ALIGN_START);
 	}
 
 	dialog = gtk_dialog_new_with_buttons(title ? title : PIDGIN_ALERT_TITLE,
@@ -609,7 +611,8 @@ pidgin_notify_message(PurpleNotifyMessageType type, const char *title,
 	gtk_label_set_markup(GTK_LABEL(label), label_text);
 	gtk_label_set_line_wrap(GTK_LABEL(label), TRUE);
 	gtk_label_set_selectable(GTK_LABEL(label), TRUE);
-	gtk_misc_set_alignment(GTK_MISC(label), 0, 0);
+	gtk_label_set_xalign(GTK_LABEL(label), 0);
+	gtk_label_set_yalign(GTK_LABEL(label), 0);
 	gtk_box_pack_start(GTK_BOX(hbox), label, FALSE, FALSE, 0);
 
 	g_object_set_data(G_OBJECT(dialog), "pidgin-parent-from",
@@ -912,7 +915,8 @@ pidgin_notify_formatted(const char *title, const char *primary,
 	gtk_label_set_markup(GTK_LABEL(label), label_text);
 	gtk_label_set_line_wrap(GTK_LABEL(label), TRUE);
 	gtk_label_set_selectable(GTK_LABEL(label), TRUE);
-	gtk_misc_set_alignment(GTK_MISC(label), 0, 0);
+	gtk_label_set_xalign(GTK_LABEL(label), 0);
+	gtk_label_set_yalign(GTK_LABEL(label), 0);
 	gtk_box_pack_start(GTK_BOX(vbox), label, FALSE, FALSE, 0);
 	gtk_widget_show(label);
 
@@ -1037,7 +1041,8 @@ pidgin_notify_searchresults(PurpleConnection *gc, const char *title,
 	label = gtk_label_new(NULL);
 	gtk_label_set_markup(GTK_LABEL(label), label_text);
 	gtk_label_set_line_wrap(GTK_LABEL(label), TRUE);
-	gtk_misc_set_alignment(GTK_MISC(label), 0, 0);
+	gtk_label_set_xalign(GTK_LABEL(label), 0);
+	gtk_label_set_yalign(GTK_LABEL(label), 0);
 	gtk_box_pack_start(GTK_BOX(vbox), label, FALSE, FALSE, 0);
 	gtk_widget_show(label);
 	g_free(label_text);
@@ -1059,7 +1064,6 @@ pidgin_notify_searchresults(PurpleConnection *gc, const char *title,
 	/* Setup the treeview */
 	treeview = gtk_tree_view_new_with_model(GTK_TREE_MODEL(model));
 	g_object_unref(G_OBJECT(model));
-	gtk_tree_view_set_rules_hint(GTK_TREE_VIEW(treeview), TRUE);
 	gtk_widget_set_size_request(treeview, 500, 400);
 	gtk_tree_selection_set_mode(gtk_tree_view_get_selection(GTK_TREE_VIEW(treeview)),
 								GTK_SELECTION_SINGLE);
@@ -1332,13 +1336,7 @@ pidgin_notify_uri(const char *uri)
 	GSList *argv = NULL, *argv_remote = NULL;
 	gchar **usercmd_argv = NULL;
 
-	/* Replace some special characters like $ with their percent-encoded
-	   value. This shouldn't be necessary because we shell-escape the entire
-	   arg before exec'ing the browser, however, we had a report that a URL
-	   containing $(xterm) was causing xterm to start on his system. This is
-	   obviously a bug on his system, but it's pretty easy for us to protect
-	   against it. */
-	uri_escaped = g_uri_escape_string(uri, ":;/%#,+?=&@", FALSE);
+	uri_escaped = purple_uri_escape_for_open(uri);
 
 	web_browser = purple_prefs_get_string(PIDGIN_PREFS_ROOT
 		"/browsers/browser");
@@ -1356,8 +1354,8 @@ pidgin_notify_uri(const char *uri)
 	} else if (purple_running_osx() == TRUE) {
 		argv = g_slist_append(argv, "open");
 		argv = g_slist_append(argv, uri_escaped);
-	} else if (!strcmp(web_browser, "epiphany") ||
-		!strcmp(web_browser, "galeon"))
+	} else if (purple_strequal(web_browser, "epiphany") ||
+		purple_strequal(web_browser, "galeon"))
 	{
 		argv = g_slist_append(argv, (gpointer)web_browser);
 
@@ -1367,13 +1365,13 @@ pidgin_notify_uri(const char *uri)
 			argv = g_slist_append(argv, "-n");
 
 		argv = g_slist_append(argv, uri_escaped);
-	} else if (!strcmp(web_browser, "xdg-open")) {
+	} else if (purple_strequal(web_browser, "xdg-open")) {
 		argv = g_slist_append(argv, "xdg-open");
 		argv = g_slist_append(argv, uri_escaped);
-	} else if (!strcmp(web_browser, "gnome-open")) {
+	} else if (purple_strequal(web_browser, "gnome-open")) {
 		argv = g_slist_append(argv, "gnome-open");
 		argv = g_slist_append(argv, uri_escaped);
-	} else if (!strcmp(web_browser, "kfmclient")) {
+	} else if (purple_strequal(web_browser, "kfmclient")) {
 		argv = g_slist_append(argv, "kfmclient");
 		argv = g_slist_append(argv, "openURL");
 		argv = g_slist_append(argv, uri_escaped);
@@ -1381,10 +1379,10 @@ pidgin_notify_uri(const char *uri)
 		 * Does Konqueror have options to open in new tab
 		 * and/or current window?
 		 */
-	} else if (!strcmp(web_browser, "mozilla") ||
-		!strcmp(web_browser, "mozilla-firebird") ||
-		!strcmp(web_browser, "firefox") ||
-		!strcmp(web_browser, "seamonkey"))
+	} else if (purple_strequal(web_browser, "mozilla") ||
+		purple_strequal(web_browser, "mozilla-firebird") ||
+		purple_strequal(web_browser, "firefox") ||
+		purple_strequal(web_browser, "seamonkey"))
 	{
 		argv = g_slist_append(argv, (gpointer)web_browser);
 		argv = g_slist_append(argv, uri_escaped);
@@ -1410,7 +1408,7 @@ pidgin_notify_uri(const char *uri)
 			 * should probably be split apart from mozilla-firebird
 			 * and mozilla... but this is good for now.
 			 */
-			if (!strcmp(web_browser, "firefox")) {
+			if (purple_strequal(web_browser, "firefox")) {
 				argv_remote = g_slist_append(argv_remote, "-a");
 				argv_remote = g_slist_append(argv_remote,
 					"firefox");
@@ -1419,7 +1417,7 @@ pidgin_notify_uri(const char *uri)
 			argv_remote = g_slist_append(argv_remote, "-remote");
 			argv_remote = g_slist_append(argv_remote, uri_custom);
 		}
-	} else if (!strcmp(web_browser, "opera")) {
+	} else if (purple_strequal(web_browser, "opera")) {
 		argv = g_slist_append(argv, "opera");
 
 		if (place == PIDGIN_BROWSER_NEW_WINDOW)
@@ -1431,28 +1429,28 @@ pidgin_notify_uri(const char *uri)
 		 */
 
 		argv = g_slist_append(argv, uri_escaped);
-	} else if (!strcmp(web_browser, "google-chrome")) {
+	} else if (purple_strequal(web_browser, "google-chrome")) {
 		/* Google Chrome doesn't have command-line arguments that
 		 * control the opening of links from external calls. This is
 		 * controlled solely from a preference within Google Chrome.
 		 */
 		argv = g_slist_append(argv, "google-chrome");
 		argv = g_slist_append(argv, uri_escaped);
-	} else if (!strcmp(web_browser, "chrome")) {
+	} else if (purple_strequal(web_browser, "chrome")) {
 		/* Chromium doesn't have command-line arguments that control
 		 * the opening of links from external calls. This is controlled
 		 * solely from a preference within Chromium.
 		 */
 		argv = g_slist_append(argv, "chrome");
 		argv = g_slist_append(argv, uri_escaped);
-	} else if (!strcmp(web_browser, "chromium-browser")) {
+	} else if (purple_strequal(web_browser, "chromium-browser")) {
 		/* Chromium doesn't have command-line arguments that control the
 		 * opening of links from external calls. This is controlled
 		 * solely from a preference within Chromium.
 		 */
 		argv = g_slist_append(argv, "chromium-browser");
 		argv = g_slist_append(argv, uri_escaped);
-	} else if (!strcmp(web_browser, "custom")) {
+	} else if (purple_strequal(web_browser, "custom")) {
 		GError *error = NULL;
 		const char *usercmd_command;
 		gint usercmd_argc, i;
@@ -1615,8 +1613,6 @@ pidgin_create_notification_dialog(PidginNotifyType type)
 	spec_dialog->treeview = gtk_tree_view_new_with_model(GTK_TREE_MODEL(model));
 	g_object_unref(G_OBJECT(model));
 
-	gtk_tree_view_set_rules_hint(GTK_TREE_VIEW(spec_dialog->treeview), TRUE);
-
 	if (type == PIDGIN_NOTIFY_MAIL) {
 		gtk_window_set_title(GTK_WINDOW(dialog), _("New Mail"));
 		gtk_window_set_role(GTK_WINDOW(dialog), "new_mail_detailed");
@@ -1737,7 +1733,8 @@ pidgin_create_notification_dialog(PidginNotifyType type)
 		GTK_STOCK_CLOSE, GTK_RESPONSE_CLOSE);
 
 	gtk_label_set_line_wrap(GTK_LABEL(label), TRUE);
-	gtk_misc_set_alignment(GTK_MISC(label), 0, 0);
+	gtk_label_set_xalign(GTK_LABEL(label), 0);
+	gtk_label_set_yalign(GTK_LABEL(label), 0);
 	gtk_box_pack_start(GTK_BOX(vbox), label, FALSE, FALSE, 0);
 	gtk_box_pack_start(GTK_BOX(vbox),
 		pidgin_make_scrollable(spec_dialog->treeview, GTK_POLICY_AUTOMATIC, GTK_POLICY_ALWAYS, GTK_SHADOW_IN, -1, -1),

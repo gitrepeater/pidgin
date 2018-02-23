@@ -58,8 +58,8 @@ struct _PurpleThemeLoaderClass
 {
 	GObjectClass parent_class;
 
-	PurpleTheme *(*purple_theme_loader_build)(const gchar*);
-	gboolean (*probe_directory)(const gchar *);
+	PurpleTheme *(*purple_theme_loader_build)(const gchar *dir);
+	gboolean (*probe_directory)(const gchar *dir);
 
 	/*< private >*/
 	void (*purple_reserved1)(void);
@@ -97,7 +97,7 @@ const gchar *purple_theme_loader_get_type_string(PurpleThemeLoader *self);
  *
  * Creates a new PurpleTheme
  *
- * Returns: A PurpleTheme containing the information from the directory
+ * Returns: (transfer full): A PurpleTheme containing the information from the directory
  */
 PurpleTheme *purple_theme_loader_build(PurpleThemeLoader *loader, const gchar *dir);
 

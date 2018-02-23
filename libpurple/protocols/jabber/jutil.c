@@ -32,10 +32,6 @@
 #include "presence.h"
 #include "jutil.h"
 
-#include "ciphers/sha1hash.h"
-#include "ciphers/sha256hash.h"
-#include "ciphers/md5hash.h"
-
 #ifdef USE_IDN
 #include <idna.h>
 #include <stringprep.h>
@@ -326,9 +322,6 @@ jabber_id_new_internal(const char *str, gboolean allow_terminating_slash)
 	const char *slash = NULL;
 	const char *c;
 	gboolean needs_validation = FALSE;
-#if 0
-	gboolean node_is_required = FALSE;
-#endif
 #ifndef USE_IDN
 	char *node = NULL;
 	char *domain;
@@ -382,28 +375,6 @@ jabber_id_new_internal(const char *str, gboolean allow_terminating_slash)
 					/* We're good */
 					break;
 
-#if 0
-				if (slash != NULL) {
-					/* characters allowed only in the resource */
-					if (implement_me)
-						/* We're good */
-						break;
-				}
-
-				/* characters allowed only in the node */
-				if (implement_me) {
-					/*
-					 * Ok, this character is valid, but only if it's a part
-					 * of the node and not the domain.  But we don't know
-					 * if "c" is a part of the node or the domain until after
-					 * we've found the @.  So set a flag for now and check
-					 * that we found an @ later.
-					 */
-					node_is_required = TRUE;
-					break;
-				}
-#endif
-
 				/*
 				 * Hmm, this character is a bit more exotic.  Better fall
 				 * back to using the more expensive UTF-8 compliant
@@ -413,12 +384,6 @@ jabber_id_new_internal(const char *str, gboolean allow_terminating_slash)
 				break;
 		}
 	}
-
-#if 0
-	if (node_is_required && at == NULL)
-		/* Found invalid characters in the domain */
-		return NULL;
-#endif
 
 	if (!needs_validation) {
 		/* JID is made of only ASCII characters--just lowercase and return */
@@ -674,7 +639,7 @@ jabber_is_own_server(JabberStream *js, const char *str)
 		return FALSE;
 
 	equal = (jid->node == NULL &&
-	         g_str_equal(jid->domain, js->user->domain) &&
+	         purple_strequal(jid->domain, js->user->domain) &&
 	         jid->resource == NULL);
 	jabber_id_free(jid);
 	return equal;
@@ -696,9 +661,9 @@ jabber_is_own_account(JabberStream *js, const char *str)
 		return FALSE;
 
 	equal = (purple_strequal(jid->node, js->user->node) &&
-	         g_str_equal(jid->domain, js->user->domain) &&
+	         purple_strequal(jid->domain, js->user->domain) &&
 	         (jid->resource == NULL ||
-	             g_str_equal(jid->resource, js->user->resource)));
+	             purple_strequal(jid->resource, js->user->resource)));
 	jabber_id_free(jid);
 	return equal;
 }
@@ -737,7 +702,7 @@ jabber_buddy_status_id_get_state(const char *id)
 		return JABBER_BUDDY_STATE_UNKNOWN;
 
 	for (i = 0; i < G_N_ELEMENTS(jabber_statuses); ++i)
-		if (g_str_equal(id, jabber_statuses[i].status_id))
+		if (purple_strequal(id, jabber_statuses[i].status_id))
 			return jabber_statuses[i].state;
 
 	return JABBER_BUDDY_STATE_UNKNOWN;
@@ -750,7 +715,7 @@ JabberBuddyState jabber_buddy_show_get_state(const char *id)
 	g_return_val_if_fail(id != NULL, JABBER_BUDDY_STATE_UNKNOWN);
 
 	for (i = 0; i < G_N_ELEMENTS(jabber_statuses); ++i)
-		if (jabber_statuses[i].show && g_str_equal(id, jabber_statuses[i].show))
+		if (jabber_statuses[i].show && purple_strequal(id, jabber_statuses[i].show))
 			return jabber_statuses[i].state;
 
 	purple_debug_warning("jabber", "Invalid value of presence <show/> "
@@ -778,38 +743,5 @@ jabber_buddy_state_get_status_id(JabberBuddyState state)
 			return jabber_statuses[i].status_id;
 
 	return NULL;
-}
-
-char *
-jabber_calculate_data_hash(gconstpointer data, size_t len,
-    const gchar *hash_algo)
-{
-	PurpleHash *hash = NULL;
-	static gchar digest[129]; /* 512 bits hex + \0 */
-
-	if (g_str_equal(hash_algo, "sha1"))
-		hash = purple_sha1_hash_new();
-	else if (g_str_equal(hash_algo, "sha256"))
-		hash = purple_sha256_hash_new();
-	else if (g_str_equal(hash_algo, "md5"))
-		hash = purple_md5_hash_new();
-
-	if (hash == NULL)
-	{
-		purple_debug_error("jabber", "Unexpected hashing algorithm %s requested\n", hash_algo);
-		g_return_val_if_reached(NULL);
-	}
-
-	/* Hash the data */
-	purple_hash_append(hash, data, len);
-	if (!purple_hash_digest_to_str(hash, digest, sizeof(digest)))
-	{
-		purple_debug_error("jabber", "Failed to get digest for %s cipher.\n",
-		    hash_algo);
-		g_return_val_if_reached(NULL);
-	}
-	g_object_unref(G_OBJECT(hash));
-
-	return g_strdup(digest);
 }
 

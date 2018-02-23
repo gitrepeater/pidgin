@@ -1,7 +1,4 @@
-/**
- * @file gtkwin32dep.c UI Win32 Specific Functionality
- * @ingroup win32
- *
+/*
  * Pidgin is the legal property of its developers, whose names are too numerous
  * to list here.  Please refer to the COPYRIGHT file distributed with this
  * source distribution.
@@ -39,7 +36,6 @@
 #include "network.h"
 
 #include "resource.h"
-#include "zlib.h"
 #include "untar.h"
 
 #include "gtkwin32dep.h"
@@ -76,36 +72,59 @@ HINSTANCE winpidgin_dll_hinstance(void) {
 }
 
 int winpidgin_gz_decompress(const char* in, const char* out) {
-	gzFile fin;
-	FILE *fout;
-	char buf[1024];
-	int ret;
+	GFile *fin;
+	GFile *fout;
+	GInputStream *input;
+	GOutputStream *output;
+	GOutputStream *conv_out;
+	GZlibDecompressor *decompressor;
+	gssize size;
+	GError *error = NULL;
 
-	if((fin = gzopen(in, "rb"))) {
-		if(!(fout = g_fopen(out, "wb"))) {
-			purple_debug_error("winpidgin_gz_decompress", "Error opening file: %s\n", out);
-			gzclose(fin);
-			return 0;
-		}
-	}
-	else {
-		purple_debug_error("winpidgin_gz_decompress", "gzopen failed to open: %s\n", in);
+	fin = g_file_new_for_path(in);
+	input = G_INPUT_STREAM(g_file_read(fin, NULL, &error));
+	g_object_unref(fin);
+
+	if (input == NULL) {
+		purple_debug_error("winpidgin_gz_decompress",
+				"Failed to open: %s: %s\n",
+				in, error->message);
+		g_clear_error(&error);
 		return 0;
 	}
 
-	while((ret = gzread(fin, buf, 1024))) {
-		if ((int)fwrite(buf, 1, ret, fout) < ret) {
-			purple_debug_error("wpurple_gz_decompress", "Error writing %d bytes to file\n", ret);
-			gzclose(fin);
-			fclose(fout);
-			return 0;
-		}
-	}
-	fclose(fout);
-	gzclose(fin);
+	fout = g_file_new_for_path(out);
+	output = G_OUTPUT_STREAM(g_file_replace(fout, NULL, FALSE,
+			G_FILE_CREATE_NONE, NULL, &error));
+	g_object_unref(fout);
 
-	if(ret < 0) {
-		purple_debug_error("winpidgin_gz_decompress", "gzread failed while reading: %s\n", in);
+	if (output == NULL) {
+		purple_debug_error("winpidgin_gz_decompress",
+				"Error opening file: %s: %s\n",
+				out, error->message);
+		g_clear_error(&error);
+		g_object_unref(input);
+		return 0;
+	}
+
+	decompressor = g_zlib_decompressor_new(G_ZLIB_COMPRESSOR_FORMAT_GZIP);
+	conv_out = g_converter_output_stream_new(output,
+			G_CONVERTER(decompressor));
+	g_object_unref(decompressor);
+	g_object_unref(output);
+
+	size = g_output_stream_splice(conv_out, input,
+			G_OUTPUT_STREAM_SPLICE_CLOSE_SOURCE |
+			G_OUTPUT_STREAM_SPLICE_CLOSE_TARGET, NULL, &error);
+
+	g_object_unref(input);
+	g_object_unref(conv_out);
+
+	if (size < 0) {
+		purple_debug_error("wpurple_gz_decompress",
+				"Error writing to file: %s\n",
+				error->message);
+		g_clear_error(&error);
 		return 0;
 	}
 
@@ -247,7 +266,7 @@ static LRESULT CALLBACK message_window_handler(HWND hwnd, UINT msg, WPARAM wpara
 		} else if (wparam == PBT_APMRESUMESUSPEND) {
 			purple_debug_info("winpidgin", "Resuming from system standby.\n");
 			/* TODO: It seems like it'd be wise to use the NLA message, if possible, instead of this. */
-			purple_timeout_add_seconds(1, winpidgin_pwm_reconnect, NULL);
+			g_timeout_add_seconds(1, winpidgin_pwm_reconnect, NULL);
 			return TRUE;
 		}
 	}
@@ -457,12 +476,49 @@ get_WorkingAreaRectForWindow(HWND hwnd, RECT *workingAreaRc) {
 	return TRUE;
 }
 
+typedef HRESULT (WINAPI* DwmIsCompositionEnabledFunction)(BOOL*);
+typedef HRESULT (WINAPI* DwmGetWindowAttributeFunction)(HWND, DWORD, PVOID, DWORD);
+static HMODULE dwmapi_module = NULL;
+static DwmIsCompositionEnabledFunction DwmIsCompositionEnabled = NULL;
+static DwmGetWindowAttributeFunction DwmGetWindowAttribute = NULL;
+#ifndef DWMWA_EXTENDED_FRAME_BOUNDS
+#	define DWMWA_EXTENDED_FRAME_BOUNDS 9
+#endif
+
+static RECT
+get_actualWindowRect(HWND hwnd)
+{
+	RECT winR;
+
+	GetWindowRect(hwnd, &winR);
+
+	if (dwmapi_module == NULL) {
+		dwmapi_module = GetModuleHandleW(L"dwmapi.dll");
+		if (dwmapi_module != NULL) {
+			DwmIsCompositionEnabled = (DwmIsCompositionEnabledFunction) GetProcAddress(dwmapi_module, "DwmIsCompositionEnabled");
+			DwmGetWindowAttribute = (DwmGetWindowAttributeFunction) GetProcAddress(dwmapi_module, "DwmGetWindowAttribute");
+		}
+	}
+
+	if (DwmIsCompositionEnabled != NULL && DwmGetWindowAttribute != NULL) {
+		BOOL pfEnabled;
+		if (SUCCEEDED(DwmIsCompositionEnabled(&pfEnabled))) {
+			RECT tempR;
+			if (SUCCEEDED(DwmGetWindowAttribute(hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, &tempR, sizeof(tempR)))) {
+				winR = tempR;
+			}
+		}
+	}
+
+	return winR;
+}
+
 void winpidgin_ensure_onscreen(GtkWidget *win) {
 	RECT winR, wAR, intR;
 	HWND hwnd = GDK_WINDOW_HWND(gtk_widget_get_window(win));
 
 	g_return_if_fail(hwnd != NULL);
-	GetWindowRect(hwnd, &winR);
+	winR = get_actualWindowRect(hwnd);
 
 	purple_debug_info("win32placement",
 			"Window RECT: L:%ld R:%ld T:%ld B:%ld\n",

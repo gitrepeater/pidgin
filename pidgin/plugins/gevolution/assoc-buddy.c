@@ -216,7 +216,7 @@ populate_treeview(GevoAssociateBuddyDialog *dialog, const gchar *uid)
 
 			for (l = ims; l != NULL; l = l->next)
 			{
-				if (!strcmp(l->data,
+				if (purple_strequal(l->data,
 					purple_buddy_get_name(dialog->buddy)))
 				{
 					GtkTreeSelection *selection;
@@ -343,7 +343,8 @@ gevo_associate_buddy_dialog_new(PurpleBuddy *buddy)
 	label = gtk_label_new(_("Select a person from your address book to "
 							"add this buddy to, or create a new person."));
 	gtk_label_set_line_wrap(GTK_LABEL(label), TRUE);
-	gtk_misc_set_alignment(GTK_MISC(label), 0, 0);
+	gtk_label_set_xalign(GTK_LABEL(label), 0);
+	gtk_label_set_yalign(GTK_LABEL(label), 0);
 	gtk_box_pack_start(GTK_BOX(vbox), label, FALSE, TRUE, 0);
 	gtk_widget_show(label);
 
@@ -395,7 +396,6 @@ gevo_associate_buddy_dialog_new(PurpleBuddy *buddy)
 	/* Now for the treeview */
 	dialog->treeview = gtk_tree_view_new_with_model(
 			GTK_TREE_MODEL(dialog->model));
-	gtk_tree_view_set_rules_hint(GTK_TREE_VIEW(dialog->treeview), TRUE);
 	gtk_box_pack_start(GTK_BOX(vbox),
 		pidgin_make_scrollable(dialog->treeview, GTK_POLICY_AUTOMATIC, GTK_POLICY_ALWAYS, GTK_SHADOW_IN, -1, -1),
 		TRUE, TRUE, 0);

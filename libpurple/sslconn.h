@@ -30,6 +30,9 @@
 
 /**
  * PurpleSslErrorType:
+ * @PURPLE_SSL_HANDSHAKE_FAILED: The handshake failed
+ * @PURPLE_SSL_CONNECT_FAILED: The connection failed
+ * @PURPLE_SSL_CERTIFICATE_INVALID: The certificated is invalid
  *
  * Possible SSL errors.
  */
@@ -47,10 +50,10 @@ typedef enum
 
 typedef struct _PurpleSslConnection PurpleSslConnection;
 
-typedef void (*PurpleSslInputFunction)(gpointer, PurpleSslConnection *,
-									 PurpleInputCondition);
-typedef void (*PurpleSslErrorFunction)(PurpleSslConnection *, PurpleSslErrorType,
-									 gpointer);
+typedef void (*PurpleSslInputFunction)(gpointer data, PurpleSslConnection *connection,
+									 PurpleInputCondition cond);
+typedef void (*PurpleSslErrorFunction)(PurpleSslConnection *connection, PurpleSslErrorType err,
+									 gpointer data);
 
 /**
  * PurpleSslConnection:
@@ -66,9 +69,10 @@ typedef void (*PurpleSslErrorFunction)(PurpleSslConnection *, PurpleSslErrorType
  * @inpa:            Glib event source ID; used to refer to the received data
  *                   callback in the glib eventloop
  * @connect_data:    Data related to the underlying TCP connection
+ * @conn:            The underlying #GTlsConnection
+ * @cancellable:     A cancellable to call when cancelled
  * @private_data:    Internal connection data managed by the SSL backend
  *                   (GnuTLS/LibNSS/whatever)
- * @verifier:        Verifier to use in authenticating the peer
  */
 struct _PurpleSslConnection
 {
@@ -234,8 +238,9 @@ size_t purple_ssl_write(PurpleSslConnection *gsc, const void *buffer, size_t len
  *
  * Obtains the peer's presented certificates
  *
- * Returns: The peer certificate chain, in the order of certificate, issuer,
- *         issuer's issuer, etc. %NULL if no certificates have been provided,
+ * Returns: (element-type GTlsCertificate): The peer certificate chain, in the
+ *          order of certificate, issuer, issuer's issuer, etc. %NULL if no
+ *          certificates have been provided.
  */
 GList * purple_ssl_get_peer_certificates(PurpleSslConnection *gsc);
 

@@ -101,11 +101,7 @@ typedef struct _PidginWebViewToolbarPriv {
  * Globals
  *****************************************************************************/
 
-static GtkHBoxClass *parent_class = NULL;
-
-/* XXX: I would bet, there is a better way to do this */
-static guint resources_ref_cnt = 0;
-static GRegex *color_parse_rgb = NULL;
+static GtkBoxClass *parent_class = NULL;
 
 /******************************************************************************
  * Prototypes
@@ -120,10 +116,9 @@ toggle_action_set_active_block(GtkToggleAction *action, gboolean is_active,
  *****************************************************************************/
 
 static gboolean
-pidgin_color_parse(const gchar *str, GdkColor *color)
+pidgin_color_parse(const gchar *str, GdkRGBA *color)
 {
-	GdkColor dummy_color;
-	gboolean succ;
+	GdkRGBA dummy_color;
 
 	if (str == NULL)
 		return FALSE;
@@ -139,50 +134,23 @@ pidgin_color_parse(const gchar *str, GdkColor *color)
 
 	if (strcmp(str, "inherit") == 0) {
 		return FALSE;
-	} else if (strncmp(str, "rgb", 3) == 0) {
-		GMatchInfo *match;
-
-		g_regex_match(color_parse_rgb, str, 0, &match);
-		succ = g_match_info_matches(match);
-		if (succ) {
-			int m_start, val;
-
-			g_match_info_fetch_pos(match, 1, &m_start, NULL);
-			val = strtoul(str + m_start, NULL, 10);
-			if (val >= 0 && val <= 255)
-				color->red = val * 256;
-			else
-				succ = FALSE;
-
-			g_match_info_fetch_pos(match, 2, &m_start, NULL);
-			val = strtoul(str + m_start, NULL, 10);
-			if (val >= 0 && val <= 255)
-				color->green = val * 256;
-			else
-				succ = FALSE;
-
-			g_match_info_fetch_pos(match, 3, &m_start, NULL);
-			val = strtoul(str + m_start, NULL, 10);
-			if (val >= 0 && val <= 255)
-				color->blue = val * 256;
-			else
-				succ = FALSE;
-		}
-
-		g_match_info_free(match);
-		return succ;
 	}
 
-	purple_debug_warning("gtkwebviewtoolbar",
-		"Invalid color format: \"%s\"", str);
-	return FALSE;
+	if (!gdk_rgba_parse(color, str)) {
+		return FALSE;
+	}
+
+	/* FALSE for fully transparent color (same behavior as with "inherit") */
+	return color->alpha > 0;
 }
 
 static gchar*
-pidgin_color_to_str(GdkColor *color)
+pidgin_color_to_str(GdkRGBA *color)
 {
-	return g_strdup_printf("#%02X%02X%02X", color->red / 256,
-		color->green / 256, color->blue / 256);
+	return g_strdup_printf("#%02X%02X%02X",
+		(unsigned int)(color->red * 255),
+		(unsigned int)(color->green * 255),
+		(unsigned int)(color->blue * 255));
 }
 
 static void
@@ -246,25 +214,6 @@ destroy_toolbar_font(PidginWebViewToolbar *toolbar)
 }
 
 static void
-realize_toolbar_font(GtkWidget *widget, PidginWebViewToolbar *toolbar)
-{
-#if !GTK_CHECK_VERSION(3,2,0)
-	PidginWebViewToolbarPriv *priv = PIDGIN_WEBVIEWTOOLBAR_GET_PRIVATE(toolbar);
-	GtkFontSelection *sel;
-
-	sel = GTK_FONT_SELECTION(
-		gtk_font_selection_dialog_get_font_selection(GTK_FONT_SELECTION_DIALOG(priv->font_dialog)));
-	gtk_widget_hide(gtk_widget_get_parent(
-		gtk_font_selection_get_size_entry(sel)));
-	gtk_widget_show_all(gtk_font_selection_get_family_list(sel));
-	gtk_widget_show(gtk_widget_get_parent(
-		gtk_font_selection_get_family_list(sel)));
-	gtk_widget_show(gtk_widget_get_parent(gtk_widget_get_parent(
-		gtk_font_selection_get_family_list(sel))));
-#endif
-}
-
-static void
 apply_font(GtkDialog *dialog, gint response, PidginWebViewToolbar *toolbar)
 {
 	/* this could be expanded to include font size, weight, etc.
@@ -321,8 +270,6 @@ toggle_font(GtkAction *font, PidginWebViewToolbar *toolbar)
 
 			g_signal_connect(G_OBJECT(priv->font_dialog), "response",
 			                 G_CALLBACK(apply_font), toolbar);
-			g_signal_connect_after(G_OBJECT(priv->font_dialog), "realize",
-			                       G_CALLBACK(realize_toolbar_font), toolbar);
 		}
 
 		gtk_window_present(GTK_WINDOW(priv->font_dialog));
@@ -362,7 +309,7 @@ static void
 do_fgcolor(GtkDialog *dialog, gint response, gpointer _toolbar)
 {
 	PidginWebViewToolbar *toolbar = _toolbar;
-	GdkColor text_color;
+	GdkRGBA text_color;
 	gchar *open_tag;
 
 	if (response != GTK_RESPONSE_OK) {
@@ -370,7 +317,7 @@ do_fgcolor(GtkDialog *dialog, gint response, gpointer _toolbar)
 		return;
 	}
 
-	pidgin_color_chooser_get_rgb(GTK_COLOR_CHOOSER(dialog), &text_color);
+	gtk_color_chooser_get_rgba(GTK_COLOR_CHOOSER(dialog), &text_color);
 	open_tag = pidgin_color_to_str(&text_color);
 	pidgin_webview_toggle_forecolor(PIDGIN_WEBVIEW(toolbar->webview),
 		open_tag);
@@ -386,7 +333,7 @@ toggle_fg_color(GtkAction *color, PidginWebViewToolbar *toolbar)
 		PIDGIN_WEBVIEWTOOLBAR_GET_PRIVATE(toolbar);
 
 	if (gtk_toggle_action_get_active(GTK_TOGGLE_ACTION(color))) {
-		GdkColor fgcolor;
+		GdkRGBA fgcolor;
 		gchar *color = pidgin_webview_get_current_forecolor(
 			PIDGIN_WEBVIEW(toolbar->webview));
 
@@ -399,7 +346,7 @@ toggle_fg_color(GtkAction *color, PidginWebViewToolbar *toolbar)
 				GTK_COLOR_CHOOSER(priv->fgcolor_dialog), FALSE);
 
 			if (pidgin_color_parse(color, &fgcolor)) {
-				pidgin_color_chooser_set_rgb(
+				gtk_color_chooser_set_rgba(
 					GTK_COLOR_CHOOSER(priv->fgcolor_dialog),
 					&fgcolor);
 			}
@@ -446,7 +393,7 @@ static void
 do_bgcolor(GtkDialog *dialog, gint response, gpointer _toolbar)
 {
 	PidginWebViewToolbar *toolbar = _toolbar;
-	GdkColor text_color;
+	GdkRGBA text_color;
 	gchar *open_tag;
 
 	if (response != GTK_RESPONSE_OK) {
@@ -454,7 +401,7 @@ do_bgcolor(GtkDialog *dialog, gint response, gpointer _toolbar)
 		return;
 	}
 
-	pidgin_color_chooser_get_rgb(GTK_COLOR_CHOOSER(dialog), &text_color);
+	gtk_color_chooser_get_rgba(GTK_COLOR_CHOOSER(dialog), &text_color);
 	open_tag = pidgin_color_to_str(&text_color);
 	pidgin_webview_toggle_backcolor(PIDGIN_WEBVIEW(toolbar->webview),
 		open_tag);
@@ -470,7 +417,7 @@ toggle_bg_color(GtkAction *color, PidginWebViewToolbar *toolbar)
 		PIDGIN_WEBVIEWTOOLBAR_GET_PRIVATE(toolbar);
 
 	if (gtk_toggle_action_get_active(GTK_TOGGLE_ACTION(color))) {
-		GdkColor bgcolor;
+		GdkRGBA bgcolor;
 		gchar *color = pidgin_webview_get_current_backcolor(
 			PIDGIN_WEBVIEW(toolbar->webview));
 
@@ -483,7 +430,7 @@ toggle_bg_color(GtkAction *color, PidginWebViewToolbar *toolbar)
 				GTK_COLOR_CHOOSER(priv->bgcolor_dialog), FALSE);
 
 			if (pidgin_color_parse(color, &bgcolor)) {
-				pidgin_color_chooser_set_rgb(
+				gtk_color_chooser_set_rgba(
 					GTK_COLOR_CHOOSER(priv->bgcolor_dialog),
 					&bgcolor);
 			}
@@ -620,7 +567,7 @@ do_insert_image_cb(GtkWidget *widget, int response, PidginWebViewToolbar *toolba
 	if (filename == NULL)
 		return;
 
-	img = purple_image_new_from_file(filename, TRUE);
+	img = purple_image_new_from_file(filename, NULL);
 
 	if (!img) {
 		gchar *buf = g_strdup_printf(_("Failed to store image: %s"),
@@ -691,15 +638,13 @@ static void
 insert_smiley_text(GtkWidget *widget, PidginWebViewToolbar *toolbar)
 {
 	PurpleSmiley *smiley;
-	PurpleImage *image;
 	guint image_id;
 	gchar *escaped_smiley, *smiley_html;
 	const gchar *smiley_class;
 
 	smiley = g_object_get_data(G_OBJECT(widget), "smiley");
 	smiley_class = g_object_get_data(G_OBJECT(widget), "smiley-class");
-	image = purple_smiley_get_image(smiley);
-	image_id = purple_image_store_add(image);
+	image_id = purple_image_store_add(PURPLE_IMAGE(smiley));
 
 	escaped_smiley = g_markup_escape_text(
 		purple_smiley_get_shortcut(smiley), -1);
@@ -722,7 +667,7 @@ smiley_dialog_input_cb(GtkWidget *dialog, GdkEvent *event,
                        PidginWebViewToolbar *toolbar)
 {
 	if ((event->type == GDK_KEY_PRESS && event->key.keyval == GDK_KEY_Escape) ||
-	    (event->type == GDK_BUTTON_PRESS && event->button.button == 1))
+	    (event->type == GDK_BUTTON_PRESS && event->button.button == GDK_BUTTON_PRIMARY))
 	{
 		close_smiley_dialog(toolbar);
 		return TRUE;
@@ -752,8 +697,7 @@ smileys_load_button_thumbs(GList *smileys)
 			continue;
 		}
 
-		pixbuf = pidgin_pixbuf_from_image(
-			purple_smiley_get_image(smiley));
+		pixbuf = pidgin_pixbuf_from_image(PURPLE_IMAGE(smiley));
 		pixbuf = pidgin_pixbuf_scale_down(pixbuf,
 			24, 24, GDK_INTERP_BILINEAR, TRUE);
 
@@ -1126,7 +1070,7 @@ update_buttons(PidginWebViewToolbar *toolbar)
 	gboolean bold, italic, underline, strike;
 	char *tmp, *color_str;
 	char *label;
-	GdkColor color;
+	GdkRGBA color;
 
 	label = g_strdup(_("_Font"));
 
@@ -1186,7 +1130,7 @@ update_buttons(PidginWebViewToolbar *toolbar)
 		PIDGIN_WEBVIEW(toolbar->webview));
 	color_str = NULL;
 	if (pidgin_color_parse(tmp, &color) &&
-		(color.red != 0 || color.green != 0 || color.blue != 0))
+		(color.red > 0 || color.green > 0 || color.blue > 0))
 	{
 		color_str = pidgin_color_to_str(&color);
 	}
@@ -1243,6 +1187,19 @@ mark_set_cb(PidginWebView *webview, PidginWebViewToolbar *toolbar)
 	update_buttons(toolbar);
 }
 
+#if GTK_CHECK_VERSION(3,22,0)
+
+static void
+pidgin_menu_clicked(GtkWidget *button, GtkMenu *menu)
+{
+	if (gtk_toggle_tool_button_get_active(GTK_TOGGLE_TOOL_BUTTON(button))) {
+		gtk_widget_show_all(GTK_WIDGET(menu));
+		gtk_menu_popup_at_widget(menu, button, GDK_GRAVITY_SOUTH_WEST, GDK_GRAVITY_NORTH_WEST, NULL);
+	}
+}
+
+#else /* GTK+ 3.22.0 */
+
 /* This comes from gtkmenutoolbutton.c from gtk+
  * Copyright (C) 2003 Ricardo Fernandez Pascual
  * Copyright (C) 2004 Paolo Borelli
@@ -1255,13 +1212,10 @@ menu_position_func(GtkMenu  *menu,
                    gpointer data)
 {
 	GtkWidget *widget = GTK_WIDGET(data);
-	GtkRequisition menu_req;
 	GtkAllocation allocation;
-	gint ythickness = gtk_widget_get_style(widget)->ythickness;
 	int savy;
 
 	gtk_widget_get_allocation(widget, &allocation);
-	gtk_widget_get_preferred_size(GTK_WIDGET(menu), NULL, &menu_req);
 	gdk_window_get_origin(gtk_widget_get_window(widget), x, y);
 	*x += allocation.x;
 	*y += allocation.y + allocation.height;
@@ -1269,7 +1223,7 @@ menu_position_func(GtkMenu  *menu,
 
 	pidgin_menu_position_func_helper(menu, x, y, push_in, data);
 
-	if (savy > *y + ythickness + 1)
+	if (savy > *y + 1)
 		*y -= allocation.height;
 }
 
@@ -1281,6 +1235,8 @@ pidgin_menu_clicked(GtkWidget *button, GtkMenu *menu)
 		gtk_menu_popup(menu, NULL, NULL, menu_position_func, button, 0, gtk_get_current_event_time());
 	}
 }
+
+#endif /* GTK+ 3.22.0 */
 
 static void
 pidgin_menu_deactivate(GtkWidget *menu, GtkToggleButton *button)
@@ -1304,7 +1260,7 @@ pidgin_webviewtoolbar_popup_menu(GtkWidget *widget, GdkEventButton *event,
 	GtkWidget *item;
 	gboolean wide;
 
-	if (event->button != 3)
+	if (!gdk_event_triggers_context_menu((GdkEvent *)event))
 		return FALSE;
 
 	wide = gtk_widget_get_visible(priv->wide_view);
@@ -1315,8 +1271,7 @@ pidgin_webviewtoolbar_popup_menu(GtkWidget *widget, GdkEventButton *event,
 	gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
 	gtk_widget_show(item);
 
-	gtk_menu_popup(GTK_MENU(menu), NULL, NULL, pidgin_menu_position_func_helper,
-	               widget, event->button, event->time);
+	gtk_menu_popup_at_pointer(GTK_MENU(menu), (GdkEvent *)event);
 
 	return TRUE;
 }
@@ -1386,11 +1341,6 @@ pidgin_webviewtoolbar_finalize(GObject *object)
 
 	purple_prefs_disconnect_by_handle(object);
 
-	if (--resources_ref_cnt == 0) {
-		g_regex_unref(color_parse_rgb);
-		color_parse_rgb = NULL;
-	}
-
 	G_OBJECT_CLASS(parent_class)->finalize(object);
 }
 
@@ -1400,7 +1350,7 @@ pidgin_webviewtoolbar_class_init(gpointer _class, gpointer class_data)
 	PidginWebViewToolbarClass *class = _class;
 	GObjectClass *gobject_class = _class;
 
-	parent_class = g_type_class_ref(GTK_TYPE_HBOX);
+	parent_class = g_type_class_ref(GTK_TYPE_BOX);
 	gobject_class->finalize = pidgin_webviewtoolbar_finalize;
 
 	g_type_class_add_private(class, sizeof(PidginWebViewToolbarPriv));
@@ -1630,12 +1580,6 @@ pidgin_webviewtoolbar_init(PidginWebViewToolbar *toolbar)
 	PidginWebViewToolbarPriv *priv = PIDGIN_WEBVIEWTOOLBAR_GET_PRIVATE(toolbar);
 	GtkWidget *hbox = GTK_WIDGET(toolbar);
 
-	if (resources_ref_cnt++ == 0) {
-		color_parse_rgb = g_regex_new("^rgb\\s*\\(\\s*"
-			"([0-9]+),\\s*([0-9]+),\\s*([0-9]+)\\s*\\)",
-			G_REGEX_OPTIMIZE, 0, NULL);
-	}
-
 	pidgin_webviewtoolbar_create_actions(toolbar);
 	pidgin_webviewtoolbar_create_wide_view(toolbar);
 	pidgin_webviewtoolbar_create_lean_view(toolbar);
@@ -1690,7 +1634,7 @@ pidgin_webviewtoolbar_get_type(void)
 			NULL
 		};
 
-		webviewtoolbar_type = g_type_register_static(GTK_TYPE_HBOX,
+		webviewtoolbar_type = g_type_register_static(GTK_TYPE_BOX,
 				"PidginWebViewToolbar", &webviewtoolbar_info, 0);
 	}
 
@@ -1738,7 +1682,7 @@ pidgin_webviewtoolbar_switch_active_conversation(PidginWebViewToolbar *toolbar,
 	 for the time being it is always disabled for chats */
 	gtk_action_set_sensitive(priv->attention,
 		conv && protocol && PURPLE_IS_IM_CONVERSATION(conv) &&
-		PURPLE_PROTOCOL_IMPLEMENTS(protocol, ATTENTION_IFACE, send));
+		PURPLE_IS_PROTOCOL_ATTENTION(protocol));
 
 	update_smiley_button(toolbar);
 }

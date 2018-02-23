@@ -31,7 +31,7 @@
 
 /* I can't believe I let ChipX86 inspire me to write good code. -Sean */
 
-#include "blistnodetypes.h"
+#include "buddy.h"
 
 #define PURPLE_TYPE_BUDDY_LIST             (purple_buddy_list_get_type())
 #define PURPLE_BUDDY_LIST(obj)             (G_TYPE_CHECK_INSTANCE_CAST((obj), PURPLE_TYPE_BUDDY_LIST, PurpleBuddyList))
@@ -48,6 +48,8 @@ typedef struct _PurpleBuddyListClass  PurpleBuddyListClass;
 typedef struct _PurpleBlistUiOps PurpleBlistUiOps;
 
 #define PURPLE_BLIST_DEFAULT_GROUP_NAME _("Buddies")
+
+#include "chat.h"
 
 /**************************************************************************/
 /* Data Structures                                                        */
@@ -68,11 +70,6 @@ struct _PurpleBuddyList {
 	gpointer ui_data;
 };
 
-/**
- * PurpleBuddyListClass:
- *
- * The base class for all #PurpleBuddyList's.
- */
 struct _PurpleBuddyListClass {
 	GObjectClass gparent_class;
 
@@ -198,8 +195,8 @@ PurpleBlistNode *purple_blist_get_root(void);
  *
  * See purple_blist_find_buddies().
  *
- * Returns: A list of every buddy in the list. Caller is responsible for
- *          freeing the list.
+ * Returns: (element-type PurpleBlistNode) (transfer container): A list of every
+ *          buddy in the list.
  */
 GSList *purple_blist_get_buddies(void);
 
@@ -383,10 +380,8 @@ PurpleBuddy *purple_blist_find_buddy_in_group(PurpleAccount *account, const char
  *
  * Finds all PurpleBuddy structs given a name and an account
  *
- * Returns:        NULL if the buddy doesn't exist, or a GSList of
- *                PurpleBuddy structs.  You must free the GSList using
- *                g_slist_free.  Do not free the PurpleBuddy structs that
- *                the list points to.
+ * Returns: (element-type PurpleBuddy) (transfer container): %NULL if the buddy
+ *          doesn't exist, or a GSList of PurpleBuddy structs.
  */
 GSList *purple_blist_find_buddies(PurpleAccount *account, const char *name);
 

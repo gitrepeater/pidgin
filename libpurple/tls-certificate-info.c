@@ -23,7 +23,6 @@
 
 #include "internal.h"
 #include "tls-certificate-info.h"
-#include "ciphers/sha1hash.h"
 #include "debug.h"
 #include "util.h"
 
@@ -221,6 +220,19 @@ typedef struct {
 	gchar *oid;
 	gchar *value;
 } DerOIDValue;
+
+static DerOIDValue *
+der_oid_value_copy(DerOIDValue *data)
+{
+	DerOIDValue *ret;
+
+	g_return_val_if_fail(data != NULL, NULL);
+
+	ret = g_new0(DerOIDValue, 1);
+	ret->oid = g_strdup(data->oid);
+	ret->value = g_strdup(data->value);
+	return ret;
+}
 
 static void
 der_oid_value_free(DerOIDValue *data)
@@ -603,6 +615,24 @@ purple_tls_certificate_get_info(GTlsCertificate *certificate)
 	return info;
 }
 
+static PurpleTlsCertificateInfo *
+purple_tls_certificate_info_copy(PurpleTlsCertificateInfo *info)
+{
+	PurpleTlsCertificateInfo *ret;
+
+	g_return_val_if_fail(info != NULL, NULL);
+
+	ret = g_new0(PurpleTlsCertificateInfo, 1);
+	ret->issuer = g_slist_copy_deep(info->issuer,
+			(GCopyFunc)der_oid_value_copy, NULL);
+	ret->notBefore = g_date_time_ref(info->notBefore);
+	ret->notAfter = g_date_time_ref(info->notAfter);
+	ret->subject = g_slist_copy_deep(info->subject,
+			(GCopyFunc)der_oid_value_copy, NULL);
+
+	return ret;
+}
+
 void
 purple_tls_certificate_info_free(PurpleTlsCertificateInfo *info)
 {
@@ -617,6 +647,10 @@ purple_tls_certificate_info_free(PurpleTlsCertificateInfo *info)
 
 	g_free(info);
 }
+
+G_DEFINE_BOXED_TYPE(PurpleTlsCertificateInfo, purple_tls_certificate_info,
+		purple_tls_certificate_info_copy,
+		purple_tls_certificate_info_free);
 
 /* Looks up the relative distinguished name (RDN) from an ObjectID */
 static const gchar *
@@ -754,7 +788,7 @@ purple_tls_certificate_info_get_subject_name(PurpleTlsCertificateInfo *info)
 GByteArray *
 purple_tls_certificate_get_fingerprint_sha1(GTlsCertificate *certificate)
 {
-	PurpleHash *hash;
+	GChecksum *hash;
 	GByteArray *der = NULL;
 	guint8 *data = NULL;
 	gsize buf_size = 0;
@@ -765,16 +799,16 @@ purple_tls_certificate_get_fingerprint_sha1(GTlsCertificate *certificate)
 
 	g_return_val_if_fail(der != NULL, NULL);
 
-	hash = purple_sha1_hash_new();
+	hash = g_checksum_new(G_CHECKSUM_SHA1);
 
-	buf_size = purple_hash_get_digest_size(hash);
+	buf_size = g_checksum_type_get_length(G_CHECKSUM_SHA1);
 	data = g_malloc(buf_size);
 
-	purple_hash_append(hash, der->data, der->len);
+	g_checksum_update(hash, der->data, der->len);
 	g_byte_array_unref(der);
 
-	purple_hash_digest(hash, data, buf_size);
-	g_object_unref(hash);
+	g_checksum_get_digest(hash, data, &buf_size);
+	g_checksum_free(hash);
 
 	return g_byte_array_new_take(data, buf_size);
 }

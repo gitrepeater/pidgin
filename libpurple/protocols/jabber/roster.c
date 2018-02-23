@@ -203,9 +203,6 @@ void jabber_roster_parse(JabberStream *js, const char *from,
                          JabberIqType type, const char *id, PurpleXmlNode *query)
 {
 	PurpleXmlNode *item, *group;
-#if 0
-	const char *ver;
-#endif
 
 	if (!jabber_is_own_account(js, from)) {
 		purple_debug_warning("jabber", "Received bogon roster push from %s\n",
@@ -232,17 +229,17 @@ void jabber_roster_parse(JabberStream *js, const char *from,
 			continue;
 
 		if(subscription) {
-			if (g_str_equal(subscription, "remove"))
+			if (purple_strequal(subscription, "remove"))
 				jb->subscription = JABBER_SUB_REMOVE;
 			else if (jb == js->user_jb)
 				jb->subscription = JABBER_SUB_BOTH;
-			else if (g_str_equal(subscription, "none"))
+			else if (purple_strequal(subscription, "none"))
 				jb->subscription = JABBER_SUB_NONE;
-			else if (g_str_equal(subscription, "to"))
+			else if (purple_strequal(subscription, "to"))
 				jb->subscription = JABBER_SUB_TO;
-			else if (g_str_equal(subscription, "from"))
+			else if (purple_strequal(subscription, "from"))
 				jb->subscription = JABBER_SUB_FROM;
-			else if (g_str_equal(subscription, "both"))
+			else if (purple_strequal(subscription, "both"))
 				jb->subscription = JABBER_SUB_BOTH;
 		}
 
@@ -284,14 +281,6 @@ void jabber_roster_parse(JabberStream *js, const char *from,
 				jabber_presence_fake_to_self(js, NULL);
 		}
 	}
-
-#if 0
-	ver = purple_xmlnode_get_attrib(query, "ver");
-	if (ver) {
-		 PurpleAccount *account = purple_connection_get_account(js->gc);
-		 purple_account_set_string(account, "roster_ver", ver);
-	}
-#endif
 
 	if (type == JABBER_IQ_SET) {
 		JabberIq *ack = jabber_iq_new(js, JABBER_IQ_RESULT);
@@ -454,7 +443,7 @@ void jabber_roster_group_change(PurpleConnection *gc, const char *name,
 	GSList *buddies, *groups = NULL;
 	PurpleBuddy *b;
 
-	if(!old_group || !new_group || !strcmp(old_group, new_group))
+	if(!old_group || !new_group || purple_strequal(old_group, new_group))
 		return;
 
 	buddies = purple_blist_find_buddies(purple_connection_get_account(gc), name);
@@ -531,9 +520,9 @@ jabber_roster_group_get_global_name(PurpleGroup *group)
 
 	if (name == NULL)
 		name = JABBER_ROSTER_DEFAULT_GROUP;
-	else if (g_strcmp0(name, PURPLE_BLIST_DEFAULT_GROUP_NAME) == 0)
+	else if (purple_strequal(name, PURPLE_BLIST_DEFAULT_GROUP_NAME))
 		name = JABBER_ROSTER_DEFAULT_GROUP;
-	else if (g_strcmp0(name, _purple_blist_get_localized_default_group_name()) == 0)
+	else if (purple_strequal(name, _purple_blist_get_localized_default_group_name()))
 		name = JABBER_ROSTER_DEFAULT_GROUP;
 
 	return name;

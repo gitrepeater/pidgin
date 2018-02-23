@@ -192,27 +192,6 @@ silcpurple_chat_getinfo_menu(PurpleBlistNode *node, gpointer data)
 }
 
 
-#if 0   /* XXX For now these are not implemented.  We need better
-	   listview dialog from Purple for these. */
-/************************** Channel Invite List ******************************/
-
-static void
-silcpurple_chat_invitelist(PurpleBlistNode *node, gpointer data);
-{
-
-}
-
-
-/**************************** Channel Ban List *******************************/
-
-static void
-silcpurple_chat_banlist(PurpleBlistNode *node, gpointer data);
-{
-
-}
-#endif
-
-
 /************************* Channel Authentication ****************************/
 
 typedef struct {
@@ -375,7 +354,7 @@ silcpurple_chat_chauth_ok(SilcPurpleChauth sgc, PurpleRequestFields *fields)
 		set = 0;
 	else if (val && !curpass)
 		set = 1;
-	else if (val && curpass && strcmp(val, curpass))
+	else if (val && curpass && !purple_strequal(val, curpass))
 		set = 1;
 	else
 		set = -1;
@@ -914,21 +893,6 @@ GList *silcpurple_chat_menu(PurpleChat *chat)
 	                           PURPLE_CALLBACK(silcpurple_chat_getinfo_menu),
 	                           NULL, NULL);
 	m = g_list_append(m, act);
-
-#if 0   /* XXX For now these are not implemented.  We need better
-	   listview dialog from Purple for these. */
-	if (mode & SILC_CHANNEL_UMODE_CHANOP) {
-		act = purple_menu_action_new(_("Invite List"),
-		                           PURPLE_CALLBACK(silcpurple_chat_invitelist),
-		                           NULL, NULL);
-		m = g_list_append(m, act);
-
-		act = purple_menu_action_new(_("Ban List"),
-		                           PURPLE_CALLBACK(silcpurple_chat_banlist),
-		                           NULL, NULL);
-		m = g_list_append(m, act);
-	}
-#endif
 
 	if (chu) {
 		act = purple_menu_action_new(_("Add Private Group"),

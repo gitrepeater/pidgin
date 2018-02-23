@@ -977,8 +977,10 @@ purple_xfer_set_message(PurpleXfer *xfer, const char *message)
 
 	g_return_if_fail(priv != NULL);
 
-	g_free(priv->message);
-	priv->message = g_strdup(message);
+	if (message != priv->message) {
+		g_free(priv->message);
+		priv->message = g_strdup(message);
+	}
 
 	g_object_notify_by_pspec(G_OBJECT(xfer), properties[PROP_MESSAGE]);
 }
@@ -1000,8 +1002,10 @@ purple_xfer_set_filename(PurpleXfer *xfer, const char *filename)
 
 	g_return_if_fail(priv != NULL);
 
-	g_free(priv->filename);
-	priv->filename = g_strdup(filename);
+	if (filename != priv->filename) {
+		g_free(priv->filename);
+		priv->filename = g_strdup(filename);
+	}
 
 	g_object_notify_by_pspec(G_OBJECT(xfer), properties[PROP_FILENAME]);
 }
@@ -1013,8 +1017,10 @@ purple_xfer_set_local_filename(PurpleXfer *xfer, const char *filename)
 
 	g_return_if_fail(priv != NULL);
 
-	g_free(priv->local_filename);
-	priv->local_filename = g_strdup(filename);
+	if (filename != priv->local_filename) {
+		g_free(priv->local_filename);
+		priv->local_filename = g_strdup(filename);
+	}
 
 	g_object_notify_by_pspec(G_OBJECT(xfer), properties[PROP_LOCAL_FILENAME]);
 }
@@ -1914,11 +1920,14 @@ purple_xfer_set_thumbnail(PurpleXfer *xfer, gconstpointer thumbnail,
 	gsize size, const gchar *mimetype)
 {
 	PurpleXferPrivate *priv = PURPLE_XFER_GET_PRIVATE(xfer);
+	gpointer old_thumbnail_data;
+	gchar *old_mimetype;
 
 	g_return_if_fail(priv != NULL);
 
-	g_free(priv->thumbnail_data);
-	g_free(priv->thumbnail_mimetype);
+	/* Hold onto these in case they are equal to passed-in pointers */
+	old_thumbnail_data = priv->thumbnail_data;
+	old_mimetype = priv->thumbnail_mimetype;
 
 	if (thumbnail && size > 0) {
 		priv->thumbnail_data = g_memdup(thumbnail, size);
@@ -1929,6 +1938,10 @@ purple_xfer_set_thumbnail(PurpleXfer *xfer, gconstpointer thumbnail,
 		priv->thumbnail_size = 0;
 		priv->thumbnail_mimetype = NULL;
 	}
+
+	/* Now it's safe to free the pointers */
+	g_free(old_thumbnail_data);
+	g_free(old_mimetype);
 }
 
 void
@@ -2347,21 +2360,23 @@ purple_xfer_new(PurpleAccount *account, PurpleXferType type, const char *who)
 	g_return_val_if_fail(who != NULL, NULL);
 
 	protocol = purple_protocols_find(purple_account_get_protocol_id(account));
+	if (PURPLE_IS_PROTOCOL_XFER(protocol)) {
+		PurpleConnection *connection = purple_account_get_connection(account);
 
-	g_return_val_if_fail(PURPLE_IS_PROTOCOL(protocol), NULL);
-
-	if (PURPLE_PROTOCOL_IMPLEMENTS(protocol, FACTORY_IFACE, xfer_new))
-		xfer = purple_protocol_factory_iface_xfer_new(protocol, account, type,
-				who);
-	else
+		xfer = purple_protocol_xfer_new_xfer(
+			PURPLE_PROTOCOL_XFER(protocol),
+			connection,
+			/* TODO: this should support the type */
+			who
+		);
+	} else {
 		xfer = g_object_new(PURPLE_TYPE_XFER,
 			"account",     account,
 			"type",        type,
 			"remote-user", who,
 			NULL
 		);
-
-	g_return_val_if_fail(xfer != NULL, NULL);
+	}
 
 	return xfer;
 }
@@ -2463,4 +2478,67 @@ purple_xfer_ui_ops_get_type(void)
 	}
 
 	return type;
+}
+
+/**************************************************************************
+ * PurpleXferProtocolInterface
+ **************************************************************************/
+G_DEFINE_INTERFACE(PurpleProtocolXfer, purple_protocol_xfer, G_TYPE_INVALID);
+
+static void
+purple_protocol_xfer_default_init(PurpleProtocolXferInterface *face) {
+}
+
+gboolean
+purple_protocol_xfer_can_receive(PurpleProtocolXfer *prplxfer,
+                                 PurpleConnection *connection,
+                                 const gchar *who
+) {
+	PurpleProtocolXferInterface *iface = NULL;
+
+	g_return_val_if_fail(PURPLE_IS_PROTOCOL_XFER(prplxfer), FALSE);
+	g_return_val_if_fail(PURPLE_IS_CONNECTION(connection), FALSE);
+	g_return_val_if_fail(who, FALSE);
+
+	iface = PURPLE_PROTOCOL_XFER_GET_IFACE(prplxfer);
+	if(iface &&  iface->can_receive)
+		return iface->can_receive(prplxfer, connection, who);
+
+	return FALSE;
+}
+
+void
+purple_protocol_xfer_send(PurpleProtocolXfer *prplxfer,
+                          PurpleConnection *connection,
+                          const gchar *who,
+                          const gchar *filename
+) {
+	PurpleProtocolXferInterface *iface = NULL;
+
+	g_return_if_fail(PURPLE_IS_PROTOCOL_XFER(prplxfer));
+	g_return_if_fail(PURPLE_IS_CONNECTION(connection));
+	g_return_if_fail(who);
+	g_return_if_fail(filename);
+
+	iface = PURPLE_PROTOCOL_XFER_GET_IFACE(prplxfer);
+	if(iface && iface->send)
+		iface->send(prplxfer, connection, who, filename);
+}
+
+PurpleXfer *
+purple_protocol_xfer_new_xfer(PurpleProtocolXfer *prplxfer,
+                              PurpleConnection *connection,
+                              const gchar *who
+) {
+	PurpleProtocolXferInterface *iface = NULL;
+
+	g_return_val_if_fail(PURPLE_IS_PROTOCOL_XFER(prplxfer), FALSE);
+	g_return_val_if_fail(PURPLE_IS_CONNECTION(connection), FALSE);
+	g_return_val_if_fail(who, FALSE);
+
+	iface = PURPLE_PROTOCOL_XFER_GET_IFACE(prplxfer);
+	if(iface && iface->new_xfer)
+		return iface->new_xfer(prplxfer, connection, who);
+
+	return NULL;
 }

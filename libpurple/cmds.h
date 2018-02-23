@@ -75,7 +75,7 @@ typedef enum {
  * A function implementing a command, as passed to purple_cmd_register().
  */
 /* TODO document the arguments to these functions. */
-typedef PurpleCmdRet (*PurpleCmdFunc)(PurpleConversation *, const gchar *cmd,
+typedef PurpleCmdRet (*PurpleCmdFunc)(PurpleConversation *conversation, const gchar *cmd,
                                   gchar **args, gchar **error, void *data);
 /**
  * PurpleCmdId:
@@ -119,6 +119,33 @@ typedef enum {
 	PURPLE_CMD_FLAG_ALLOW_WRONG_ARGS = 0x08
 } PurpleCmdFlag;
 
+/**
+ * PurpleCommandsUiOps:
+ * @register_command: If implemented, the UI is responsible for handling
+ *		commands. See @purple_cmd_register for the argument values.
+ * @unregister_command: Should be implemented if register_command is
+ *		implemented. @name and @prpl_id will have the same value
+ *		that were used for the register_command call.
+ *
+ * Command UI operations;  UIs should implement this if they want to handle
+ * commands themselves, rather than relying on the core.
+ *
+ * See <link linkend="chapter-ui-ops">List of <literal>UiOps</literal>
+ * Structures</link>
+ */
+typedef struct {
+	void (*register_command)(const gchar *name, PurpleCmdPriority priority,
+				 PurpleCmdFlag flags, const gchar *prpl_id,
+				 const gchar *help, PurpleCmdId id);
+
+	void (*unregister_command)(const gchar *name, const gchar *prpl_id);
+
+	/*< private >*/
+	void (*_purple_reserved1)(void);
+	void (*_purple_reserved2)(void);
+	void (*_purple_reserved3)(void);
+	void (*_purple_reserved4)(void);
+} PurpleCommandsUiOps;
 
 G_BEGIN_DECLS
 
@@ -221,19 +248,35 @@ PurpleCmdStatus purple_cmd_do_command(PurpleConversation *conv, const gchar *cmd
                                   const gchar *markup, gchar **errormsg);
 
 /**
+ * purple_cmd_execute:
+ * @id: The command to execute.
+ * @conv: The conversation the command was typed in.
+ * @cmdline: The command the user typed (only the arguments).
+ *            The caller should remove the prefix and the command name.
+ *            It should not contain any formatting, and should be
+ *            in plain text (no HTML entities).
+ *
+ * Execute a specific command.
+ *
+ * The UI calls this to execute a command, after parsing the
+ * command name.
+ *
+ * Returns: %TRUE if the command handled the @cmdline, %FALSE otherwise.
+ */
+gboolean purple_cmd_execute(PurpleCmdId id, PurpleConversation *conv,
+			    const gchar *cmdline);
+
+/**
  * purple_cmd_list:
  * @conv: The conversation, or %NULL.
  *
  * List registered commands.
  *
- * Returns a #GList (which must be freed by the caller) of all commands
+ * Returns: (element-type utf8) (transfer container): All commands
  * that are valid in the context of @conv, or all commands, if @conv is
  * %NULL.  Don't keep this list around past the main loop, or anything else that
  * might unregister a command, as the <type>const char *</type>'s used get freed
  * then.
- *
- * Returns: A #GList of <type>const char *</type>, which must be freed with
- *          g_list_free().
  */
 GList *purple_cmd_list(PurpleConversation *conv);
 
@@ -245,11 +288,8 @@ GList *purple_cmd_list(PurpleConversation *conv);
  *
  * Get the help string for a command.
  *
- * Returns the help strings for a given command in the form of a GList,
- * one node for each matching command.
- *
- * Returns: A #GList of <type>const char *</type>s, which is the help string
- *         for that command.
+ * Returns: (element-type utf8) (transfer container): the help strings for a
+ *          given command, one node for each matching command.
  */
 GList *purple_cmd_help(PurpleConversation *conv, const gchar *cmd);
 
@@ -261,6 +301,26 @@ GList *purple_cmd_help(PurpleConversation *conv, const gchar *cmd);
  * Returns: The handle
  */
 gpointer purple_cmds_get_handle(void);
+
+/**
+ * purple_cmds_set_ui_ops:
+ * @ops: The UI operations structure.
+ *
+ * Sets the UI operations structure to be used when registering and
+ * unregistering commands.  The UI operations need only be set if the
+ * UI wants to handle the commands itself; otherwise, leave it as NULL.
+ */
+void purple_cmds_set_ui_ops(PurpleCommandsUiOps *ops);
+
+/**
+ * purple_cmds_get_ui_ops:
+ *
+ * Returns the UI operations structure to be used when registering and
+ * unregistering commands.
+ *
+ * Returns: (transfer none): The UI operations structure.
+ */
+PurpleCommandsUiOps *purple_cmds_get_ui_ops(void);
 
 /**
  * purple_cmds_init:

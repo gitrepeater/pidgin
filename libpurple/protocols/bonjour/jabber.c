@@ -158,10 +158,6 @@ _jabber_parse_and_write_message_to_ui(PurpleXmlNode *message_node, PurpleBuddy *
 
 	events_node = purple_xmlnode_get_child_with_namespace(message_node, "x", "jabber:x:event");
 	if (events_node != NULL) {
-#if 0
-		if (purple_xmlnode_get_child(events_node, "composing") != NULL)
-			composing_event = TRUE;
-#endif
 		if (purple_xmlnode_get_child(events_node, "id") != NULL) {
 			/* The user is just typing */
 			/* TODO: Deal with typing notification */
@@ -373,9 +369,9 @@ void bonjour_jabber_process_packet(PurpleBuddy *pb, PurpleXmlNode *packet) {
 	g_return_if_fail(packet != NULL);
 	g_return_if_fail(pb != NULL);
 
-	if (g_strcmp0(packet->name, "message") == 0)
+	if (purple_strequal(packet->name, "message"))
 		_jabber_parse_and_write_message_to_ui(packet, pb);
-	else if (g_strcmp0(packet->name, "iq") == 0)
+	else if (purple_strequal(packet->name, "iq"))
 		xep_iq_parse(packet, pb);
 	else {
 		purple_debug_warning("bonjour", "Unknown packet: %s\n",
@@ -393,17 +389,7 @@ static void bonjour_jabber_stream_ended(BonjourJabberConversation *bconv) {
 
 	if(bconv->pb != NULL)
 		bb = purple_buddy_get_protocol_data(bconv->pb);
-#if 0
-	if(bconv->pb != NULL) {
-		PurpleConversation *conv;
-		conv = purple_conversations_find_im_with_account(bconv->pb->name, bconv->pb->account);
-		if (conv != NULL) {
-			char *tmp = g_strdup_printf(_("%s has closed the conversation."), bconv->pb->name);
-			purple_conversation_write_system_message(conv, tmp, 0);
-			g_free(tmp);
-		}
-	}
-#endif
+
 	/* Close the socket, clear the watcher and free memory */
 	bonjour_jabber_close_conversation(bconv);
 	if(bb)
@@ -736,16 +722,6 @@ start_serversocket_listening(int port, int socket, common_sockaddr_t *addr, size
 		purple_debug_error("bonjour", "Unable to listen on IPv%d socket: %s\n", ip6 ? 6 : 4, g_strerror(errno));
 		return -1;
 	}
-
-#if 0
-	/* TODO: Why isn't this being used? */
-	data->socket = purple_network_listen(jdata->port, AF_UNSPEC, SOCK_STREAM, TRUE);
-
-	if (jdata->socket == -1)
-	{
-		purple_debug_error("bonjour", "No se ha podido crear el socket\n");
-	}
-#endif
 
 	return ret_port;
 }
@@ -1139,7 +1115,7 @@ async_bonjour_jabber_close_conversation(BonjourJabberConversation *bconv) {
 			bb->conversation = NULL;
 	}
 
-	bconv->close_timeout = purple_timeout_add(0, _async_bonjour_jabber_close_conversation_cb, bconv);
+	bconv->close_timeout = g_timeout_add(0, _async_bonjour_jabber_close_conversation_cb, bconv);
 }
 
 void
@@ -1168,7 +1144,7 @@ bonjour_jabber_close_conversation(BonjourJabberConversation *bconv)
 				tmp_next = xfers->next;
 				/* We only need to cancel this if it hasn't actually started transferring. */
 				/* This will change if we ever support IBB transfers. */
-				if (strcmp(purple_xfer_get_remote_user(xfer), purple_buddy_get_name(bconv->pb)) == 0
+				if (purple_strequal(purple_xfer_get_remote_user(xfer), purple_buddy_get_name(bconv->pb))
 						&& (purple_xfer_get_status(xfer) == PURPLE_XFER_STATUS_NOT_STARTED
 							|| purple_xfer_get_status(xfer) == PURPLE_XFER_STATUS_UNKNOWN)) {
 					purple_xfer_cancel_remote(xfer);
@@ -1210,7 +1186,7 @@ bonjour_jabber_close_conversation(BonjourJabberConversation *bconv)
 			bonjour_parser_setup(bconv);
 
 		if (bconv->close_timeout != 0)
-			purple_timeout_remove(bconv->close_timeout);
+			g_source_remove(bconv->close_timeout);
 
 		g_free(bconv->buddy_name);
 		g_free(bconv->ip);
@@ -1333,8 +1309,8 @@ xep_iq_parse(PurpleXmlNode *packet, PurpleBuddy *pb)
 	if(check_if_blocked(pb))
 		return;
 
-		account = purple_buddy_get_account(pb);
-		gc = purple_account_get_connection(account);
+	account = purple_buddy_get_account(pb);
+	gc = purple_account_get_connection(account);
 
 	if (purple_xmlnode_get_child(packet, "si") != NULL || purple_xmlnode_get_child(packet, "error") != NULL)
 		xep_si_parse(gc, packet, pb);
