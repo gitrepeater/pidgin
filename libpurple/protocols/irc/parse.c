@@ -115,6 +115,7 @@ static struct _irc_msg {
 	{ "906", "*", 0, irc_msg_authfail },		/* SASL auth failed		*/
 	{ "907", "*", 0, irc_msg_authfail },		/* SASL auth failed		*/
 	{ "cap", "vv:", 3, irc_msg_cap },		/* SASL capable			*/
+	{ "authenticate", ":", 1, irc_msg_authenticate }, /* SASL authenticate		*/
 #endif
 	{ "invite", "n:", 2, irc_msg_invite },		/* Invited			*/
 	{ "join", ":", 1, irc_msg_join },		/* Joined a channel		*/
@@ -679,6 +680,13 @@ void irc_parse_msg(struct irc_conn *irc, char *input)
 	 * instead of a null terminated string.
 	 */
 	purple_signal_emit(_irc_plugin, "irc-receiving-text", gc, &input);
+
+	if (purple_debug_is_verbose()) {
+		char *clean = purple_utf8_salvage(input);
+		clean = g_strstrip(clean);
+		purple_debug_misc("irc", ">> %s\n", clean);
+		g_free(clean);
+	}
 
 	if (!strncmp(input, "PING ", 5)) {
 		msg = irc_format(irc, "vv", "PONG", input + 5);
