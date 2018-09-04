@@ -167,6 +167,7 @@ if ENABLE_GTK
 	    	IOKIT,
 	    	json,
 	    	math,
+	    	talkatu,
 	    	webkit,
 	    	x11,
 	    	libpurple_dep,
@@ -226,7 +227,7 @@ if ENABLE_GTK
 
 		gnome.generate_gir(libpidgin,
 		    sources : introspection_sources,
-		    includes : ['GObject-2.0', 'Gtk-3.0', libpurple_gir[0], 'WebKit-3.0'],
+		    includes : ['GObject-2.0', 'Gtk-3.0', libpurple_gir[0], 'WebKit-3.0', 'Talkatu-0.0'],
 		    namespace : 'Pidgin',
 		    symbol_prefix : 'pidgin',
 		    identifier_prefix : 'Pidgin',
