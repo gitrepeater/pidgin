@@ -204,11 +204,15 @@ struct _PurpleProtocolXferInterface
 	GTypeInterface parent_iface;
 
 	/*< public >*/
-	gboolean (*can_receive)(PurpleProtocolXfer *prplxfer, PurpleConnection *c, const gchar *who);
+	gboolean (*can_receive)(PurpleProtocolXfer *prplxfer,
+			PurpleConnection *connection, const gchar *who);
 
-	void (*send_file)(PurpleProtocolXfer *prplxfer, PurpleConnection *c, const gchar *who, const gchar *filename);
+	void (*send_file)(PurpleProtocolXfer *prplxfer,
+			PurpleConnection *connection, const gchar *who,
+			const gchar *filename);
 
-	PurpleXfer *(*new_xfer)(PurpleProtocolXfer *prplxfer, PurpleConnection *c, const gchar *who);
+	PurpleXfer *(*new_xfer)(PurpleProtocolXfer *prplxfer,
+			PurpleConnection *connection, const gchar *who);
 };
 
 G_BEGIN_DECLS
@@ -303,7 +307,7 @@ PurpleXferType purple_xfer_get_xfer_type(PurpleXfer *xfer);
  *
  * Returns the account the file transfer is using.
  *
- * Returns: The account.
+ * Returns: (transfer none): The account.
  */
 PurpleAccount *purple_xfer_get_account(PurpleXfer *xfer);
 
@@ -931,7 +935,8 @@ GType purple_xfer_ui_ops_get_type(void);
  *
  * Returns all xfers
  *
- * Returns: all current xfers with refs
+ * Returns: (element-type Purple.Xfer) (transfer none): all current xfers
+ *          with refs
  */
 GList *purple_xfers_get_all(void);
 
@@ -1010,14 +1015,14 @@ gboolean purple_protocol_xfer_can_receive(PurpleProtocolXfer *prplxfer, PurpleCo
 void purple_protocol_xfer_send_file(PurpleProtocolXfer *prplxfer, PurpleConnection *connection, const gchar *who, const gchar *filename);
 
 /**
- * purple_protocol_xfer_send:
+ * purple_protocol_xfer_new_xfer:
  * @prplxfer: The #PurpleProtocolXfer implementer instance
  * @connection: The #PurpleConnection that we're checking
  * @who: The user that we want to send a file transfer to.
  *
  * Creates a new #PurpleXfer to @who.
  *
- * Returns: A new #PurpleXfer instance.
+ * Returns: (transfer full): A new #PurpleXfer instance.
  */
 PurpleXfer *purple_protocol_xfer_new_xfer(PurpleProtocolXfer *prplxfer, PurpleConnection *connection, const gchar *who);
 
