@@ -40,10 +40,8 @@
 
 #define PURPLE_TYPE_PLUGIN             GPLUGIN_TYPE_PLUGIN
 #define PURPLE_PLUGIN(obj)             GPLUGIN_PLUGIN(obj)
-#define PURPLE_PLUGIN_CLASS(klass)     GPLUGIN_PLUGIN_CLASS(klass)
 #define PURPLE_IS_PLUGIN(obj)          GPLUGIN_IS_PLUGIN(obj)
-#define PURPLE_IS_PLUGIN_CLASS(klass)  GPLUGIN_IS_PLUGIN_CLASS(klass)
-#define PURPLE_PLUGIN_GET_CLASS(obj)   GPLUGIN_PLUGIN_GET_CLASS(obj)
+#define PURPLE_PLUGIN_GET_IFACE(obj)   GPLUGIN_PLUGIN_GET_IFACE(obj)
 
 /**
  * PurplePlugin:
@@ -53,7 +51,7 @@
  */
 typedef GPluginPlugin PurplePlugin;
 
-typedef GPluginPluginClass PurplePluginClass;
+typedef GPluginPluginInterface PurplePluginInterface;
 
 #define PURPLE_TYPE_PLUGIN_INFO             (purple_plugin_info_get_type())
 #define PURPLE_PLUGIN_INFO(obj)             (G_TYPE_CHECK_INSTANCE_CAST((obj), PURPLE_TYPE_PLUGIN_INFO, PurplePluginInfo))
@@ -373,7 +371,7 @@ gboolean purple_plugin_unload(PurplePlugin *plugin, GError **error);
  *
  * Returns: %TRUE if loaded, or %FALSE otherwise.
  */
-gboolean purple_plugin_is_loaded(const PurplePlugin *plugin);
+gboolean purple_plugin_is_loaded(PurplePlugin *plugin);
 
 /**
  * purple_plugin_get_filename:
@@ -383,7 +381,7 @@ gboolean purple_plugin_is_loaded(const PurplePlugin *plugin);
  *
  * Returns: The plugin's filename.
  */
-const gchar *purple_plugin_get_filename(const PurplePlugin *plugin);
+const gchar *purple_plugin_get_filename(PurplePlugin *plugin);
 
 /**
  * purple_plugin_get_info:
@@ -397,7 +395,7 @@ const gchar *purple_plugin_get_filename(const PurplePlugin *plugin);
  * where we use the plugin info. The plugin info instance is guaranteed to
  * exist as long as the plugin exists.
  */
-PurplePluginInfo *purple_plugin_get_info(const PurplePlugin *plugin);
+PurplePluginInfo *purple_plugin_get_info(PurplePlugin *plugin);
 
 /**
  * purple_plugin_disable:
@@ -453,7 +451,7 @@ void purple_plugin_add_interface(PurplePlugin *plugin, GType instance_type,
  *
  * Returns: %TRUE if the plugin is an internal plugin, %FALSE otherwise.
  */
-gboolean purple_plugin_is_internal(const PurplePlugin *plugin);
+gboolean purple_plugin_is_internal(PurplePlugin *plugin);
 
 /**
  * purple_plugin_get_dependent_plugins:
@@ -464,7 +462,7 @@ gboolean purple_plugin_is_internal(const PurplePlugin *plugin);
  * Returns: (element-type PurplePlugin) (transfer none): The list of a plugins that depend on the specified
  *                           plugin.
  */
-GSList *purple_plugin_get_dependent_plugins(const PurplePlugin *plugin);
+GSList *purple_plugin_get_dependent_plugins(PurplePlugin *plugin);
 
 /**************************************************************************/
 /* PluginInfo API                                                         */
