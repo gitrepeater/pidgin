@@ -149,10 +149,10 @@ if ENABLE_GTK
 		)
 	endif
 
-	install_headers(libpidgin_headers, subdir : 'pidgin')
+	install_headers(libpidgin_headers, subdir : 'pidgin-3')
 
 	libpidgin_inc = include_directories('.')
-	libpidgin = shared_library('pidgin',
+	libpidgin = shared_library('pidgin3',
 	    libpidgin_SOURCES,
 	    package_revision,
 	    include_directories : [toplevel_inc],
@@ -176,7 +176,7 @@ if ENABLE_GTK
 	    link_with : libpidgin,
 	    dependencies : [webkit, gtk, glib, math])
 
-	pidgin = executable('pidgin',
+	pidgin = executable('pidgin3',
 	    pidgin_SOURCES,
 	    include_directories : toplevel_inc,
 	    dependencies : IS_WIN32 ? [] : [libpurple_dep, libpidgin_dep],
@@ -193,13 +193,13 @@ if ENABLE_GTK
 	    description : 'Pidgin is a GTK3-based instant messenger application.',
 	    version : meson.project_version(),
 	    filebase : 'pidgin-3',
-	    subdirs : 'pidgin',
+	    subdirs : 'pidgin-3',
 	    libraries : [libpidgin],
 	    requires : ['gtk+-3.0', 'webkitgtk-3.0', 'purple-3'],
-	    variables : ['plugindir=${libdir}/pidgin'])
+	    variables : ['plugindir=${libdir}/pidgin-@0@'.format(purple_major_version)])
 
 	if INSTALL_I18N
-		DESKTOP_FILE = 'im.pidgin.Pidgin.desktop'
+		DESKTOP_FILE = 'im.pidgin.Pidgin3.desktop'
 		desktop_file_in = configure_file(
 		    input : 'data/' + DESKTOP_FILE + '.in.in',
 		    output : DESKTOP_FILE + '.in',
@@ -213,8 +213,8 @@ if ENABLE_GTK
 		    install_dir : get_option('datadir') + '/applications')
 
 		appdata = i18n.merge_file(
-		    input : 'data/im.pidgin.Pidgin.appdata.xml.in',
-		    output : 'im.pidgin.Pidgin.appdata.xml',
+		    input : 'data/im.pidgin.Pidgin3.appdata.xml.in',
+		    output : 'im.pidgin.Pidgin3.appdata.xml',
 		    po_dir : meson.source_root() + '/po',
 		    install : true,
 		    install_dir : get_option('datadir') + '/metainfo')
