@@ -711,7 +711,6 @@ pidgin_startup_cb(GApplication *app, gpointer user_data)
 int pidgin_start(int argc, char *argv[])
 {
 	GApplication *app;
-	gchar *summary;
 	int ret;
 
 #ifdef DEBUG
@@ -734,10 +733,6 @@ int pidgin_start(int argc, char *argv[])
 				G_APPLICATION_CAN_OVERRIDE_APP_ID |
 #endif
 				G_APPLICATION_HANDLES_COMMAND_LINE));
-
-	summary = g_strdup_printf("%s %s", PIDGIN_NAME, DISPLAY_VERSION);
-	g_application_set_option_context_summary(app, summary);
-	g_free(summary);
 
 	g_application_add_main_option_entries(app, option_entries);
 	g_application_add_option_group(app, purple_get_option_group());
