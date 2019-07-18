@@ -129,8 +129,8 @@ typedef struct
 
 } PidginBuddyListPrivate;
 
-#define PIDGIN_BUDDY_LIST_GET_PRIVATE(list) \
-	((PidginBuddyListPrivate *)((list)->priv))
+G_DEFINE_TYPE_WITH_PRIVATE(PidginBuddyList, pidgin_buddy_list,
+                           PURPLE_TYPE_BUDDY_LIST)
 
 #define PIDGIN_WINDOW_ICONIFIED(x) \
 	(gdk_window_get_state(gtk_widget_get_window(GTK_WIDGET(x))) & \
@@ -249,14 +249,14 @@ static gboolean gtk_blist_delete_cb(GtkWidget *w, GdkEventAny *event, gpointer d
 }
 
 static void
-gtk_blist_hide_cb(GtkWidget *widget, gpointer data)
+gtk_blist_hide_cb(GtkWidget *widget, PidginBuddyList *gtkblist)
 {
 	purple_signal_emit(pidgin_blist_get_handle(),
 			"gtkblist-hiding", gtkblist);
 }
 
 static void
-gtk_blist_show_cb(GtkWidget *widget, gpointer data)
+gtk_blist_show_cb(GtkWidget *widget, PidginBuddyList *gtkblist)
 {
 	purple_signal_emit(pidgin_blist_get_handle(),
 			"gtkblist-unhiding", gtkblist);
@@ -407,6 +407,7 @@ static void gtk_blist_renderer_editing_started_cb(GtkCellRenderer *renderer,
 		gchar *path_str,
 		gpointer user_data)
 {
+	PidginBuddyList *gtkblist = PIDGIN_BUDDY_LIST(user_data);
 	GtkTreeIter iter;
 	GtkTreePath *path = NULL;
 	PurpleBlistNode *node;
@@ -548,6 +549,7 @@ gtk_blist_auto_personize(PurpleBlistNode *group, const char *alias)
 static void gtk_blist_renderer_edited_cb(GtkCellRendererText *text_rend, char *arg1,
 					 char *arg2, PurpleBuddyList *list)
 {
+	PidginBuddyList *gtkblist = PIDGIN_BUDDY_LIST(list);
 	GtkTreeIter iter;
 	GtkTreePath *path;
 	PurpleBlistNode *node;
@@ -974,7 +976,7 @@ make_blist_request_dialog(PidginBlistRequestData *data, PurpleAccount *account,
 	img = gtk_image_new_from_icon_name("dialog-question",
 			GTK_ICON_SIZE_DIALOG);
 
-	gtkblist = PIDGIN_BLIST(purple_blist_get_default());
+	gtkblist = PIDGIN_BUDDY_LIST(purple_blist_get_default());
 	blist_window = gtkblist ? GTK_WINDOW(gtkblist->window) : NULL;
 
 	data->window = gtk_dialog_new();
@@ -1152,6 +1154,7 @@ pidgin_blist_joinchat_show(void)
 
 static void gtk_blist_row_expanded_cb(GtkTreeView *tv, GtkTreeIter *iter, GtkTreePath *path, gpointer user_data)
 {
+	PidginBuddyList *gtkblist = PIDGIN_BUDDY_LIST(user_data);
 	PurpleBlistNode *node;
 
 	gtk_tree_model_get(GTK_TREE_MODEL(gtkblist->treemodel), iter, NODE_COLUMN, &node, -1);
@@ -1174,6 +1177,7 @@ static void gtk_blist_row_expanded_cb(GtkTreeView *tv, GtkTreeIter *iter, GtkTre
 
 static void gtk_blist_row_collapsed_cb(GtkTreeView *tv, GtkTreeIter *iter, GtkTreePath *path, gpointer user_data)
 {
+	PidginBuddyList *gtkblist = PIDGIN_BUDDY_LIST(user_data);
 	PurpleBlistNode *node;
 
 	gtk_tree_model_get(GTK_TREE_MODEL(gtkblist->treemodel), iter, NODE_COLUMN, &node, -1);
@@ -1209,6 +1213,7 @@ static void gtk_blist_row_collapsed_cb(GtkTreeView *tv, GtkTreeIter *iter, GtkTr
 }
 
 static void gtk_blist_row_activated_cb(GtkTreeView *tv, GtkTreePath *path, GtkTreeViewColumn *col, gpointer data) {
+	PidginBuddyList *gtkblist = PIDGIN_BUDDY_LIST(data);
 	PurpleBlistNode *node;
 	GtkTreeIter iter;
 
@@ -4564,7 +4569,7 @@ update_menu_bar(PidginBuddyList *gtkblist)
 static void
 sign_on_off_cb(PurpleConnection *gc, PurpleBuddyList *blist)
 {
-	PidginBuddyList *gtkblist = PIDGIN_BLIST(blist);
+	PidginBuddyList *gtkblist = PIDGIN_BUDDY_LIST(blist);
 
 	update_menu_bar(gtkblist);
 }
@@ -4793,64 +4798,9 @@ conversation_created_cb(PurpleConversation *conv, PidginBuddyList *gtkblist)
 	}
 }
 
-/**************************************************************************
- * GTK Buddy list GBoxed code
- **************************************************************************/
-static PidginBuddyList *
-pidgin_buddy_list_ref(PidginBuddyList *gtkblist)
-{
-	PidginBuddyListPrivate *priv;
-
-	g_return_val_if_fail(gtkblist != NULL, NULL);
-
-	priv = PIDGIN_BUDDY_LIST_GET_PRIVATE(gtkblist);
-	priv->box_count++;
-
-	return gtkblist;
-}
-
-static void
-pidgin_buddy_list_unref(PidginBuddyList *gtkblist)
-{
-	PidginBuddyListPrivate *priv;
-
-	g_return_if_fail(gtkblist != NULL);
-
-	priv = PIDGIN_BUDDY_LIST_GET_PRIVATE(gtkblist);
-
-	g_return_if_fail(priv->box_count >= 0);
-
-	if (!priv->box_count--)
-		purple_core_quit();
-}
-
-GType
-pidgin_buddy_list_get_type(void)
-{
-	static GType type = 0;
-
-	if (type == 0) {
-		type = g_boxed_type_register_static("PidginBuddyList",
-				(GBoxedCopyFunc)pidgin_buddy_list_ref,
-				(GBoxedFreeFunc)pidgin_buddy_list_unref);
-	}
-
-	return type;
-}
-
 /**********************************************************************************
  * Public API Functions                                                           *
  **********************************************************************************/
-
-static void pidgin_blist_new_list(PurpleBuddyList *blist)
-{
-	PidginBuddyList *gtkblist;
-
-	gtkblist = g_new0(PidginBuddyList, 1);
-	gtkblist->priv = g_new0(PidginBuddyListPrivate, 1);
-
-	blist->ui_data = gtkblist;
-}
 
 static void
 pidgin_blist_new_node(PurpleBuddyList *list, PurpleBlistNode *node)
@@ -4943,7 +4893,7 @@ static gboolean pidgin_blist_select_notebook_page_cb(gpointer user_data)
 	GList *list = NULL;
 	PidginBuddyListPrivate *priv;
 
-	priv = PIDGIN_BUDDY_LIST_GET_PRIVATE(gtkblist);
+	priv = pidgin_buddy_list_get_instance_private(gtkblist);
 
 	priv->select_notebook_page_timeout = 0;
 
@@ -4963,7 +4913,8 @@ static gboolean pidgin_blist_select_notebook_page_cb(gpointer user_data)
 
 static void pidgin_blist_select_notebook_page(PidginBuddyList *gtkblist)
 {
-	PidginBuddyListPrivate *priv = PIDGIN_BUDDY_LIST_GET_PRIVATE(gtkblist);
+	PidginBuddyListPrivate *priv =
+	        pidgin_buddy_list_get_instance_private(gtkblist);
 	priv->select_notebook_page_timeout = g_timeout_add(0,
 		pidgin_blist_select_notebook_page_cb, gtkblist);
 }
@@ -5096,7 +5047,8 @@ static void
 add_error_dialog(PidginBuddyList *gtkblist,
                  GtkWidget *dialog)
 {
-	PidginBuddyListPrivate *priv = PIDGIN_BUDDY_LIST_GET_PRIVATE(gtkblist);
+	PidginBuddyListPrivate *priv =
+	        pidgin_buddy_list_get_instance_private(gtkblist);
 	gtk_container_add(GTK_CONTAINER(priv->error_scrollbook), dialog);
 }
 
@@ -5213,7 +5165,8 @@ add_generic_error_dialog(PurpleAccount *account,
 static void
 remove_generic_error_dialog(PurpleAccount *account)
 {
-	PidginBuddyListPrivate *priv = PIDGIN_BUDDY_LIST_GET_PRIVATE(gtkblist);
+	PidginBuddyListPrivate *priv =
+	        pidgin_buddy_list_get_instance_private(gtkblist);
 	remove_child_widget_by_account(
 		GTK_CONTAINER(priv->error_scrollbook), account);
 }
@@ -5223,7 +5176,8 @@ static void
 update_generic_error_message(PurpleAccount *account,
                              const char *description)
 {
-	PidginBuddyListPrivate *priv = PIDGIN_BUDDY_LIST_GET_PRIVATE(gtkblist);
+	PidginBuddyListPrivate *priv =
+	        pidgin_buddy_list_get_instance_private(gtkblist);
 	GtkWidget *mini_dialog = find_child_widget_by_account(
 		GTK_CONTAINER(priv->error_scrollbook), account);
 	pidgin_mini_dialog_set_description(PIDGIN_MINI_DIALOG(mini_dialog),
@@ -5281,7 +5235,8 @@ clear_elsewhere_errors(PidginMiniDialog *mini_dialog,
 static void
 ensure_signed_on_elsewhere_minidialog(PidginBuddyList *gtkblist)
 {
-	PidginBuddyListPrivate *priv = PIDGIN_BUDDY_LIST_GET_PRIVATE(gtkblist);
+	PidginBuddyListPrivate *priv =
+	        pidgin_buddy_list_get_instance_private(gtkblist);
 	PidginMiniDialog *mini_dialog;
 
 	if(priv->signed_on_elsewhere)
@@ -5309,7 +5264,8 @@ ensure_signed_on_elsewhere_minidialog(PidginBuddyList *gtkblist)
 static void
 update_signed_on_elsewhere_minidialog_title(void)
 {
-	PidginBuddyListPrivate *priv = PIDGIN_BUDDY_LIST_GET_PRIVATE(gtkblist);
+	PidginBuddyListPrivate *priv =
+	        pidgin_buddy_list_get_instance_private(gtkblist);
 	PidginMiniDialog *mini_dialog = priv->signed_on_elsewhere;
 	guint accounts;
 	char *title;
@@ -5363,7 +5319,8 @@ create_account_label(PurpleAccount *account)
 static void
 add_to_signed_on_elsewhere(PurpleAccount *account)
 {
-	PidginBuddyListPrivate *priv = PIDGIN_BUDDY_LIST_GET_PRIVATE(gtkblist);
+	PidginBuddyListPrivate *priv =
+	        pidgin_buddy_list_get_instance_private(gtkblist);
 	PidginMiniDialog *mini_dialog;
 	GtkWidget *account_label;
 
@@ -5383,7 +5340,8 @@ add_to_signed_on_elsewhere(PurpleAccount *account)
 static void
 remove_from_signed_on_elsewhere(PurpleAccount *account)
 {
-	PidginBuddyListPrivate *priv = PIDGIN_BUDDY_LIST_GET_PRIVATE(gtkblist);
+	PidginBuddyListPrivate *priv =
+	        pidgin_buddy_list_get_instance_private(gtkblist);
 	PidginMiniDialog *mini_dialog = priv->signed_on_elsewhere;
 	if(mini_dialog == NULL)
 		return;
@@ -5398,7 +5356,8 @@ static void
 update_signed_on_elsewhere_tooltip(PurpleAccount *account,
                                    const char *description)
 {
-	PidginBuddyListPrivate *priv = PIDGIN_BUDDY_LIST_GET_PRIVATE(gtkblist);
+	PidginBuddyListPrivate *priv =
+	        pidgin_buddy_list_get_instance_private(gtkblist);
 	GtkContainer *c = GTK_CONTAINER(priv->signed_on_elsewhere->contents);
 	GtkWidget *label = find_child_widget_by_account(c, account);
 	gtk_widget_set_tooltip_text(label, description);
@@ -5625,7 +5584,10 @@ pidgin_blist_build_layout(PurpleBuddyList *list)
 							    "cell-background-rgba", BGCOLOR_COLUMN,
 							    "markup", NAME_COLUMN,
 							    NULL);
-			g_signal_connect(G_OBJECT(rend), "editing-started", G_CALLBACK(gtk_blist_renderer_editing_started_cb), NULL);
+			g_signal_connect(
+			        G_OBJECT(rend), "editing-started",
+			        G_CALLBACK(gtk_blist_renderer_editing_started_cb),
+			        list);
 			g_signal_connect(G_OBJECT(rend), "editing-canceled", G_CALLBACK(gtk_blist_renderer_editing_cancelled_cb), list);
 			g_signal_connect(G_OBJECT(rend), "edited", G_CALLBACK(gtk_blist_renderer_edited_cb), list);
 			g_object_set(rend, "ypad", 0, "yalign", 0.5, NULL);
@@ -5750,8 +5712,8 @@ static void pidgin_blist_show(PurpleBuddyList *list)
 		return;
 	}
 
-	gtkblist = PIDGIN_BLIST(list);
-	priv = PIDGIN_BUDDY_LIST_GET_PRIVATE(gtkblist);
+	gtkblist = PIDGIN_BUDDY_LIST(list);
+	priv = pidgin_buddy_list_get_instance_private(gtkblist);
 
 	if (priv->current_theme)
 		g_object_unref(priv->current_theme);
@@ -5777,9 +5739,9 @@ static void pidgin_blist_show(PurpleBuddyList *list)
 
 	g_signal_connect(G_OBJECT(gtkblist->window), "delete_event", G_CALLBACK(gtk_blist_delete_cb), NULL);
 	g_signal_connect(G_OBJECT(gtkblist->window), "hide",
-			G_CALLBACK(gtk_blist_hide_cb), NULL);
+	                 G_CALLBACK(gtk_blist_hide_cb), gtkblist);
 	g_signal_connect(G_OBJECT(gtkblist->window), "show",
-			G_CALLBACK(gtk_blist_show_cb), NULL);
+	                 G_CALLBACK(gtk_blist_show_cb), gtkblist);
 	g_signal_connect(G_OBJECT(gtkblist->window), "size-allocate",
 			G_CALLBACK(gtk_blist_size_allocate_cb), NULL);
 	g_signal_connect(G_OBJECT(gtkblist->window), "visibility_notify_event", G_CALLBACK(gtk_blist_visibility_cb), NULL);
@@ -5957,9 +5919,12 @@ static void pidgin_blist_show(PurpleBuddyList *list)
 	gtk_tree_view_append_column(GTK_TREE_VIEW(gtkblist->treeview), gtkblist->text_column);
 	pidgin_blist_build_layout(list);
 
-	g_signal_connect(G_OBJECT(gtkblist->treeview), "row-activated", G_CALLBACK(gtk_blist_row_activated_cb), NULL);
-	g_signal_connect(G_OBJECT(gtkblist->treeview), "row-expanded", G_CALLBACK(gtk_blist_row_expanded_cb), NULL);
-	g_signal_connect(G_OBJECT(gtkblist->treeview), "row-collapsed", G_CALLBACK(gtk_blist_row_collapsed_cb), NULL);
+	g_signal_connect(G_OBJECT(gtkblist->treeview), "row-activated",
+	                 G_CALLBACK(gtk_blist_row_activated_cb), gtkblist);
+	g_signal_connect(G_OBJECT(gtkblist->treeview), "row-expanded",
+	                 G_CALLBACK(gtk_blist_row_expanded_cb), gtkblist);
+	g_signal_connect(G_OBJECT(gtkblist->treeview), "row-collapsed",
+	                 G_CALLBACK(gtk_blist_row_collapsed_cb), gtkblist);
 	g_signal_connect(G_OBJECT(gtkblist->treeview), "button-press-event", G_CALLBACK(gtk_blist_button_press_cb), NULL);
 	g_signal_connect(G_OBJECT(gtkblist->treeview), "key-press-event", G_CALLBACK(gtk_blist_key_press_cb), NULL);
 	g_signal_connect(G_OBJECT(gtkblist->treeview), "popup-menu", G_CALLBACK(pidgin_blist_popup_menu_cb), NULL);
@@ -6113,7 +6078,7 @@ static void redo_buddy_list(PurpleBuddyList *list, gboolean remove, gboolean rer
 {
 	PurpleBlistNode *node;
 
-	gtkblist = PIDGIN_BLIST(list);
+	gtkblist = PIDGIN_BUDDY_LIST(list);
 	if(!gtkblist || !gtkblist->treeview)
 		return;
 
@@ -6150,7 +6115,7 @@ pidgin_blist_update_refresh_timeout()
 	PidginBuddyList *gtkblist;
 
 	blist = purple_blist_get_default();
-	gtkblist = PIDGIN_BLIST(blist);
+	gtkblist = PIDGIN_BUDDY_LIST(blist);
 
 	gtkblist->refresh_timer = g_timeout_add_seconds(30,(GSourceFunc)pidgin_blist_refresh_timer, blist);
 }
@@ -6836,7 +6801,7 @@ static void pidgin_blist_update_chat(PurpleBuddyList *list, PurpleBlistNode *nod
 static void pidgin_blist_update(PurpleBuddyList *list, PurpleBlistNode *node)
 {
 	if (list)
-		gtkblist = PIDGIN_BLIST(list);
+		gtkblist = PIDGIN_BUDDY_LIST(list);
 	if(!gtkblist || !gtkblist->treeview || !node)
 		return;
 
@@ -6851,51 +6816,6 @@ static void pidgin_blist_update(PurpleBuddyList *list, PurpleBlistNode *node)
 		pidgin_blist_update_buddy(list, node, TRUE);
 	else if (PURPLE_IS_CHAT(node))
 		pidgin_blist_update_chat(list, node);
-}
-
-static void pidgin_blist_destroy(PurpleBuddyList *list)
-{
-	PidginBuddyListPrivate *priv;
-
-	if (!list || !list->ui_data)
-		return;
-
-	g_return_if_fail(list->ui_data == gtkblist);
-
-	purple_signals_disconnect_by_handle(gtkblist);
-
-	gtk_widget_destroy(gtkblist->window);
-
-	pidgin_blist_tooltip_destroy();
-
-	if (gtkblist->refresh_timer)
-		g_source_remove(gtkblist->refresh_timer);
-	if (gtkblist->timeout)
-		g_source_remove(gtkblist->timeout);
-	if (gtkblist->drag_timeout)
-		g_source_remove(gtkblist->drag_timeout);
-
-	gtkblist->refresh_timer = 0;
-	gtkblist->timeout = 0;
-	gtkblist->drag_timeout = 0;
-	gtkblist->window = gtkblist->vbox = gtkblist->treeview = NULL;
-	g_object_unref(G_OBJECT(gtkblist->treemodel));
-	gtkblist->treemodel = NULL;
-	g_object_unref(G_OBJECT(gtkblist->ui));
-	g_object_unref(G_OBJECT(gtkblist->empty_avatar));
-
-	priv = PIDGIN_BUDDY_LIST_GET_PRIVATE(gtkblist);
-
-	if (priv->current_theme)
-		g_object_unref(priv->current_theme);
-	if (priv->select_notebook_page_timeout)
-		g_source_remove(priv->select_notebook_page_timeout);
-	g_free(priv);
-
-	g_free(gtkblist);
-	accountmenu = NULL;
-	gtkblist = NULL;
-	purple_prefs_disconnect_by_handle(pidgin_blist_get_handle());
 }
 
 static void pidgin_blist_set_visible(PurpleBuddyList *list, gboolean show)
@@ -7382,31 +7302,6 @@ set_urgent(void)
 		pidgin_set_urgent(GTK_WINDOW(gtkblist->window), TRUE);
 }
 
-static PurpleBlistUiOps blist_ui_ops =
-{
-	pidgin_blist_new_list,
-	pidgin_blist_new_node,
-	pidgin_blist_show,
-	pidgin_blist_update,
-	pidgin_blist_remove,
-	pidgin_blist_destroy,
-	pidgin_blist_set_visible,
-	pidgin_blist_request_add_buddy,
-	pidgin_blist_request_add_chat,
-	pidgin_blist_request_add_group,
-	NULL,
-	NULL,
-	NULL,
-	NULL, NULL, NULL, NULL
-};
-
-
-PurpleBlistUiOps *
-pidgin_blist_get_ui_ops(void)
-{
-	return &blist_ui_ops;
-}
-
 PidginBuddyList *pidgin_blist_get_default_gtk_blist()
 {
 	return gtkblist;
@@ -7485,7 +7380,8 @@ static void buddy_signonoff_cb(PurpleBuddy *buddy)
 void
 pidgin_blist_set_theme(PidginBlistTheme *theme)
 {
-	PidginBuddyListPrivate *priv = PIDGIN_BUDDY_LIST_GET_PRIVATE(gtkblist);
+	PidginBuddyListPrivate *priv =
+	        pidgin_buddy_list_get_instance_private(gtkblist);
 	PurpleBuddyList *list = purple_blist_get_default();
 
 	if (theme != NULL)
@@ -7508,7 +7404,8 @@ pidgin_blist_set_theme(PidginBlistTheme *theme)
 PidginBlistTheme *
 pidgin_blist_get_theme()
 {
-	PidginBuddyListPrivate *priv = PIDGIN_BUDDY_LIST_GET_PRIVATE(gtkblist);
+	PidginBuddyListPrivate *priv =
+	        pidgin_buddy_list_get_instance_private(gtkblist);
 
 	return priv->current_theme;
 }
@@ -7576,6 +7473,77 @@ pidgin_blist_uninit(void) {
 
 	purple_signals_unregister_by_instance(pidgin_blist_get_handle());
 	purple_signals_disconnect_by_handle(pidgin_blist_get_handle());
+
+	accountmenu = NULL;
+	gtkblist = NULL;
+}
+
+/**************************************************************************
+ * GTK Buddy list GObject code
+ **************************************************************************/
+static void
+pidgin_buddy_list_init(PidginBuddyList *self)
+{
+}
+
+static void
+pidgin_buddy_list_finalize(GObject *obj)
+{
+	PidginBuddyList *gtkblist = PIDGIN_BUDDY_LIST(obj);
+	PidginBuddyListPrivate *priv =
+	        pidgin_buddy_list_get_instance_private(gtkblist);
+
+	purple_signals_disconnect_by_handle(gtkblist);
+
+	gtk_widget_destroy(gtkblist->window);
+
+	pidgin_blist_tooltip_destroy();
+
+	if (gtkblist->refresh_timer) {
+		g_source_remove(gtkblist->refresh_timer);
+		gtkblist->refresh_timer = 0;
+	}
+	if (gtkblist->timeout) {
+		g_source_remove(gtkblist->timeout);
+		gtkblist->timeout = 0;
+	}
+	if (gtkblist->drag_timeout) {
+		g_source_remove(gtkblist->drag_timeout);
+		gtkblist->drag_timeout = 0;
+	}
+
+	gtkblist->window = gtkblist->vbox = gtkblist->treeview = NULL;
+	g_clear_object(&gtkblist->treemodel);
+	g_object_unref(G_OBJECT(gtkblist->ui));
+	g_object_unref(G_OBJECT(gtkblist->empty_avatar));
+
+	g_clear_object(&priv->current_theme);
+	if (priv->select_notebook_page_timeout) {
+		g_source_remove(priv->select_notebook_page_timeout);
+	}
+
+	purple_prefs_disconnect_by_handle(pidgin_blist_get_handle());
+
+	G_OBJECT_CLASS(pidgin_buddy_list_parent_class)->finalize(obj);
+}
+
+static void
+pidgin_buddy_list_class_init(PidginBuddyListClass *klass)
+{
+	GObjectClass *obj_class = G_OBJECT_CLASS(klass);
+	PurpleBuddyListClass *purple_blist_class;
+
+	obj_class->finalize = pidgin_buddy_list_finalize;
+
+	purple_blist_class = PURPLE_BUDDY_LIST_CLASS(klass);
+	purple_blist_class->new_node = pidgin_blist_new_node;
+	purple_blist_class->show = pidgin_blist_show;
+	purple_blist_class->update = pidgin_blist_update;
+	purple_blist_class->remove = pidgin_blist_remove;
+	purple_blist_class->set_visible = pidgin_blist_set_visible;
+	purple_blist_class->request_add_buddy = pidgin_blist_request_add_buddy;
+	purple_blist_class->request_add_chat = pidgin_blist_request_add_chat;
+	purple_blist_class->request_add_group = pidgin_blist_request_add_group;
 }
 
 /*********************************************************************

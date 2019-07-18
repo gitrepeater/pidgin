@@ -33,19 +33,8 @@
 
 #include "buddy.h"
 
-#define PURPLE_TYPE_BUDDY_LIST             (purple_buddy_list_get_type())
-#define PURPLE_BUDDY_LIST(obj)             (G_TYPE_CHECK_INSTANCE_CAST((obj), PURPLE_TYPE_BUDDY_LIST, PurpleBuddyList))
-#define PURPLE_BUDDY_LIST_CLASS(klass)     (G_TYPE_CHECK_CLASS_CAST((klass), PURPLE_TYPE_BUDDY_LIST, PurpleBuddyListClass))
-#define PURPLE_IS_BUDDY_LIST(obj)          (G_TYPE_CHECK_INSTANCE_TYPE((obj), PURPLE_TYPE_BUDDY_LIST))
-#define PURPLE_IS_BUDDY_LIST_CLASS(klass)  (G_TYPE_CHECK_CLASS_TYPE((klass), PURPLE_TYPE_BUDDY_LIST))
-#define PURPLE_BUDDY_LIST_GET_CLASS(obj)   (G_TYPE_INSTANCE_GET_CLASS((obj), PURPLE_TYPE_BUDDY_LIST, PurpleBuddyListClass))
-
-typedef struct _PurpleBuddyList       PurpleBuddyList;
-typedef struct _PurpleBuddyListClass  PurpleBuddyListClass;
-
-#define PURPLE_TYPE_BLIST_UI_OPS (purple_blist_ui_ops_get_type())
-
-typedef struct _PurpleBlistUiOps PurpleBlistUiOps;
+#define PURPLE_TYPE_BUDDY_LIST (purple_buddy_list_get_type())
+typedef struct _PurpleBuddyList PurpleBuddyList;
 
 #define PURPLE_BLIST_DEFAULT_GROUP_NAME _("Buddies")
 
@@ -67,55 +56,32 @@ typedef void (*PurpleBlistWalkFunc)(PurpleBlistNode *node, gpointer data);
 /**************************************************************************/
 /**
  * PurpleBuddyList:
- * @root:    The first node in the buddy list
- * @ui_data: The UI data associated with this buddy list. This is a convenience
- *           field provided to the UIs -- it is not used by the libpurple core.
  *
  * The Buddy List
  */
-struct _PurpleBuddyList {
-	GObject gparent;
-
-	/*< public >*/
-	PurpleBlistNode *root;
-	gpointer ui_data;
-};
-
-struct _PurpleBuddyListClass {
-	GObjectClass gparent_class;
-
-	/*< private >*/
-	void (*_purple_reserved1)(void);
-	void (*_purple_reserved2)(void);
-	void (*_purple_reserved3)(void);
-	void (*_purple_reserved4)(void);
-};
-
 /**
- * PurpleBlistUiOps:
- * @new_list:     Sets UI-specific data on a buddy list.
+ * PurpleBuddyListClass:
  * @new_node:     Sets UI-specific data on a node.
  * @show:         The core will call this when it's finished doing its core
- *                stuff
+ *                stuff.
  * @update:       This will update a node in the buddy list.
  * @remove:       This removes a node from the list
- * @destroy:      When the list is destroyed, this is called to destroy the UI.
- * @set_visible:  Hides or unhides the buddy list
+ * @set_visible:  Hides or unhides the buddy list.
  * @save_node:    This is called when a node has been modified and should be
  *                saved.
- *                <sbr/>Implementation of this UI op is
+ *                <sbr/>Implementation of this method is
  *                <emphasis>OPTIONAL</emphasis>. If not implemented, it will be
  *                set to a fallback function that saves data to
  *                <filename>blist.xml</filename> like in previous libpurple
  *                versions.
  *                <sbr/>@node: The node which has been modified.
  * @remove_node:  Called when a node is about to be removed from the buddy list.
- *                The UI op should update the relevant data structures to remove
- *                this node (for example, removing a buddy from the group this
- *                node is in).
- *                <sbr/>Implementation of this UI op is
- *                <emphasis>OPTIONAL</emphasis>. If not implemented,
- *                it will be set to a fallback function that saves data to
+ *                The method should update the relevant data structures to
+ *                remove this node (for example, removing a buddy from the
+ *                group this node is in).
+ *                <sbr/>Implementation of this method is
+ *                <emphasis>OPTIONAL</emphasis>. If not implemented, it will be
+ *                set to a fallback function that saves data to
  *                <filename>blist.xml</filename> like in previous libpurple
  *                versions.
  *                <sbr/>@node: The node which has been modified.
@@ -123,7 +89,7 @@ struct _PurpleBuddyListClass {
  *                this, the callback must save the privacy and buddy list data
  *                for an account. If the account is %NULL, save the data for all
  *                accounts.
- *                <sbr/>Implementation of this UI op is
+ *                <sbr/>Implementation of this method is
  *                <emphasis>OPTIONAL</emphasis>. If not implemented, it will be
  *                set to a fallback function that saves data to
  *                <filename>blist.xml</filename> like in previous
@@ -131,19 +97,19 @@ struct _PurpleBuddyListClass {
  *                <sbr/>@account: The account whose data to save. If %NULL,
  *                                save all data for all accounts.
  *
- * Buddy list UI operations.
+ * Buddy list operations.
  *
- * Any UI representing a buddy list must assign a filled-out PurpleBlistUiOps
- * structure to the buddy list core.
+ * Any UI representing a buddy list must derive a filled-out
+ * @PurpleBuddyListClass and set the GType using purple_blist_set_ui() before a
+ * buddy list is created.
  */
-struct _PurpleBlistUiOps
-{
-	void (*new_list)(PurpleBuddyList *list);
+struct _PurpleBuddyListClass {
+	GObjectClass gparent_class;
+
 	void (*new_node)(PurpleBuddyList *list, PurpleBlistNode *node);
 	void (*show)(PurpleBuddyList *list);
 	void (*update)(PurpleBuddyList *list, PurpleBlistNode *node);
 	void (*remove)(PurpleBuddyList *list, PurpleBlistNode *node);
-	void (*destroy)(PurpleBuddyList *list);
 	void (*set_visible)(PurpleBuddyList *list, gboolean show);
 
 	void (*request_add_buddy)(PurpleBuddyList *list, PurpleAccount *account,
@@ -162,10 +128,7 @@ struct _PurpleBlistUiOps
 	void (*save_account)(PurpleBuddyList *list, PurpleAccount *account);
 
 	/*< private >*/
-	void (*_purple_reserved1)(void);
-	void (*_purple_reserved2)(void);
-	void (*_purple_reserved3)(void);
-	void (*_purple_reserved4)(void);
+	gpointer reserved[4];
 };
 
 G_BEGIN_DECLS
@@ -179,7 +142,8 @@ G_BEGIN_DECLS
  *
  * Returns: The #GType for the #PurpleBuddyList object.
  */
-GType purple_buddy_list_get_type(void);
+G_DECLARE_DERIVABLE_TYPE(PurpleBuddyList, purple_buddy_list, PURPLE, BUDDY_LIST,
+                         GObject)
 
 /**
  * purple_blist_get_default:
@@ -226,23 +190,6 @@ PurpleBlistNode *purple_blist_get_root(PurpleBuddyList *list);
  *          buddy in the list.
  */
 GSList *purple_blist_get_buddies(void);
-
-/**
- * purple_blist_get_ui_data:
- *
- * Returns the UI data for the list.
- *
- * Returns: The UI data for the list.
- */
-gpointer purple_blist_get_ui_data(void);
-
-/**
- * purple_blist_set_ui_data:
- * @ui_data: The UI data for the list.
- *
- * Sets the UI data for the list.
- */
-void purple_blist_set_ui_data(gpointer ui_data);
 
 /**
  * purple_blist_show:
@@ -524,10 +471,6 @@ void purple_blist_request_add_chat(PurpleAccount *account, PurpleGroup *group,
  */
 void purple_blist_request_add_group(void);
 
-/**************************************************************************/
-/* Buddy list UI Functions                                                */
-/**************************************************************************/
-
 /**
  * purple_blist_new_node:
  * @list: The list that contains the node.
@@ -583,36 +526,21 @@ void purple_blist_save_node(PurpleBuddyList *list, PurpleBlistNode *node);
 void purple_blist_save_account(PurpleBuddyList *list, PurpleAccount *account);
 
 /**************************************************************************/
-/* UI Registration Functions                                              */
-/**************************************************************************/
-
-/**
- * purple_blist_ui_ops_get_type:
- *
- * Returns: The #GType for the #PurpleBlistUiOps boxed structure.
- */
-GType purple_blist_ui_ops_get_type(void);
-
-/**
- * purple_blist_set_ui_ops:
- * @ops: The ops struct.
- *
- * Sets the UI operations structure to be used for the buddy list.
- */
-void purple_blist_set_ui_ops(PurpleBlistUiOps *ops);
-
-/**
- * purple_blist_get_ui_ops:
- *
- * Returns the UI operations structure to be used for the buddy list.
- *
- * Returns: The UI operations structure.
- */
-PurpleBlistUiOps *purple_blist_get_ui_ops(void);
-
-/**************************************************************************/
 /* Buddy List Subsystem                                                   */
 /**************************************************************************/
+
+/**
+ * purple_blist_set_ui:
+ * @type: The @GType of a derived UI implementation of @PurpleBuddyList.
+ *
+ * Set the UI implementation of the buddy list.
+ *
+ * This must be called before the buddy list is created or you will get the
+ * default libpurple implementation.
+ *
+ * Since: 3.0.0
+ */
+void purple_blist_set_ui(GType type);
 
 /**
  * purple_blist_get_handle:
