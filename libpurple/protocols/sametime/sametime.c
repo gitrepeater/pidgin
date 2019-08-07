@@ -5260,7 +5260,7 @@ mw_protocol_class_init(PurpleProtocolClass *klass)
 
 
 static void
-mw_protocol_client_iface_init(PurpleProtocolClientIface *client_iface)
+mw_protocol_client_iface_init(PurpleProtocolClientInterface *client_iface)
 {
   client_iface->get_actions     = mw_protocol_get_actions;
   client_iface->list_emblem     = mw_protocol_list_emblem;
@@ -5274,7 +5274,7 @@ mw_protocol_client_iface_init(PurpleProtocolClientIface *client_iface)
 
 
 static void
-mw_protocol_server_iface_init(PurpleProtocolServerIface *server_iface)
+mw_protocol_server_iface_init(PurpleProtocolServerInterface *server_iface)
 {
   server_iface->get_info     = mw_protocol_get_info;
   server_iface->set_status   = mw_protocol_set_status;
@@ -5291,7 +5291,7 @@ mw_protocol_server_iface_init(PurpleProtocolServerIface *server_iface)
 
 
 static void
-mw_protocol_im_iface_init(PurpleProtocolIMIface *im_iface)
+mw_protocol_im_iface_init(PurpleProtocolIMInterface *im_iface)
 {
   im_iface->send        = mw_protocol_send_im;
   im_iface->send_typing = mw_protocol_send_typing;
@@ -5299,7 +5299,7 @@ mw_protocol_im_iface_init(PurpleProtocolIMIface *im_iface)
 
 
 static void
-mw_protocol_chat_iface_init(PurpleProtocolChatIface *chat_iface)
+mw_protocol_chat_iface_init(PurpleProtocolChatInterface *chat_iface)
 {
   chat_iface->info          = mw_protocol_chat_info;
   chat_iface->info_defaults = mw_protocol_chat_info_defaults;
@@ -5313,7 +5313,7 @@ mw_protocol_chat_iface_init(PurpleProtocolChatIface *chat_iface)
 
 
 static void
-mw_protocol_privacy_iface_init(PurpleProtocolPrivacyIface *privacy_iface)
+mw_protocol_privacy_iface_init(PurpleProtocolPrivacyInterface *privacy_iface)
 {
   privacy_iface->add_permit      = mw_protocol_add_permit;
   privacy_iface->add_deny        = mw_protocol_add_deny;
@@ -5335,19 +5335,19 @@ mw_protocol_xfer_iface_init(PurpleProtocolXferInterface *xfer_iface)
 PURPLE_DEFINE_TYPE_EXTENDED(
   mwProtocol, mw_protocol, PURPLE_TYPE_PROTOCOL, 0,
 
-  PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_CLIENT_IFACE,
+  PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_CLIENT,
                                     mw_protocol_client_iface_init)
 
-  PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_SERVER_IFACE,
+  PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_SERVER,
                                     mw_protocol_server_iface_init)
 
-  PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_IM_IFACE,
+  PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_IM,
                                     mw_protocol_im_iface_init)
 
-  PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_CHAT_IFACE,
+  PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_CHAT,
                                     mw_protocol_chat_iface_init)
 
-  PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_PRIVACY_IFACE,
+  PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_PRIVACY,
                                     mw_protocol_privacy_iface_init)
 
   PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_XFER,

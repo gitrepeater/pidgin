@@ -1582,7 +1582,7 @@ facebook_protocol_class_init(PurpleProtocolClass *klass)
 }
 
 static void
-facebook_protocol_client_iface_init(PurpleProtocolClientIface *iface)
+facebook_protocol_client_iface_init(PurpleProtocolClientInterface *iface)
 {
 	iface->tooltip_text    = fb_client_tooltip_text;
 	iface->blist_node_menu = fb_client_blist_node_menu;
@@ -1590,20 +1590,20 @@ facebook_protocol_client_iface_init(PurpleProtocolClientIface *iface)
 }
 
 static void
-facebook_protocol_server_iface_init(PurpleProtocolServerIface *iface)
+facebook_protocol_server_iface_init(PurpleProtocolServerInterface *iface)
 {
 	iface->set_status = fb_server_set_status;
 }
 
 static void
-facebook_protocol_im_iface_init(PurpleProtocolIMIface *iface)
+facebook_protocol_im_iface_init(PurpleProtocolIMInterface *iface)
 {
 	iface->send        = fb_im_send;
 	iface->send_typing = fb_im_send_typing;
 }
 
 static void
-facebook_protocol_chat_iface_init(PurpleProtocolChatIface *iface)
+facebook_protocol_chat_iface_init(PurpleProtocolChatInterface *iface)
 {
 	iface->info          = fb_chat_info;
 	iface->info_defaults = fb_chat_info_defaults;
@@ -1615,7 +1615,7 @@ facebook_protocol_chat_iface_init(PurpleProtocolChatIface *iface)
 }
 
 static void
-facebook_protocol_roomlist_iface_init(PurpleProtocolRoomlistIface *iface)
+facebook_protocol_roomlist_iface_init(PurpleProtocolRoomlistInterface *iface)
 {
 	iface->get_list = fb_roomlist_get_list;
 	iface->cancel   = fb_roomlist_cancel;
@@ -1624,15 +1624,15 @@ facebook_protocol_roomlist_iface_init(PurpleProtocolRoomlistIface *iface)
 PURPLE_DEFINE_TYPE_EXTENDED(
 	FacebookProtocol, facebook_protocol, PURPLE_TYPE_PROTOCOL, 0,
 
-	PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_CLIENT_IFACE,
+	PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_CLIENT,
 	                                  facebook_protocol_client_iface_init)
-	PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_SERVER_IFACE,
+	PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_SERVER,
 	                                  facebook_protocol_server_iface_init)
-	PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_IM_IFACE,
+	PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_IM,
 	                                  facebook_protocol_im_iface_init)
-	PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_CHAT_IFACE,
+	PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_CHAT,
 	                                  facebook_protocol_chat_iface_init)
-	PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_ROOMLIST_IFACE,
+	PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_ROOMLIST,
 	                                  facebook_protocol_roomlist_iface_init)
 );
 

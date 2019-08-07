@@ -2185,7 +2185,7 @@ simple_protocol_class_init(PurpleProtocolClass *klass)
 }
 
 static void
-simple_protocol_server_iface_init(PurpleProtocolServerIface *server_iface)
+simple_protocol_server_iface_init(PurpleProtocolServerInterface *server_iface)
 {
 	server_iface->set_status   = simple_set_status;
 	server_iface->add_buddy    = simple_add_buddy;
@@ -2195,7 +2195,7 @@ simple_protocol_server_iface_init(PurpleProtocolServerIface *server_iface)
 }
 
 static void
-simple_protocol_im_iface_init(PurpleProtocolIMIface *im_iface)
+simple_protocol_im_iface_init(PurpleProtocolIMInterface *im_iface)
 {
 	im_iface->send        = simple_im_send;
 	im_iface->send_typing = simple_typing;
@@ -2204,10 +2204,10 @@ simple_protocol_im_iface_init(PurpleProtocolIMIface *im_iface)
 PURPLE_DEFINE_TYPE_EXTENDED(
 	SIMPLEProtocol, simple_protocol, PURPLE_TYPE_PROTOCOL, 0,
 
-	PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_SERVER_IFACE,
+	PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_SERVER,
 	                                  simple_protocol_server_iface_init)
 
-	PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_IM_IFACE,
+	PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_IM,
 	                                  simple_protocol_im_iface_init)
 );
 

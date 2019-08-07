@@ -44,13 +44,13 @@ aim_protocol_class_init(PurpleProtocolClass *klass)
 }
 
 static void
-aim_protocol_client_iface_init(PurpleProtocolClientIface *client_iface)
+aim_protocol_client_iface_init(PurpleProtocolClientInterface *client_iface)
 {
 	client_iface->get_max_message_size = oscar_get_max_message_size;
 }
 
 static void
-aim_protocol_privacy_iface_init(PurpleProtocolPrivacyIface *privacy_iface)
+aim_protocol_privacy_iface_init(PurpleProtocolPrivacyInterface *privacy_iface)
 {
 	privacy_iface->add_permit      = oscar_add_permit;
 	privacy_iface->rem_permit      = oscar_rem_permit;
@@ -60,9 +60,9 @@ aim_protocol_privacy_iface_init(PurpleProtocolPrivacyIface *privacy_iface)
 PURPLE_DEFINE_TYPE_EXTENDED(
 	AIMProtocol, aim_protocol, OSCAR_TYPE_PROTOCOL, 0,
 
-	PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_CLIENT_IFACE,
+	PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_CLIENT,
 	                                  aim_protocol_client_iface_init)
 
-	PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_PRIVACY_IFACE,
+	PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_PRIVACY,
 	                                  aim_protocol_privacy_iface_init)
 );

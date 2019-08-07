@@ -1033,7 +1033,7 @@ null_protocol_class_init(PurpleProtocolClass *klass)
 }
 
 static void
-null_protocol_client_iface_init(PurpleProtocolClientIface *client_iface)
+null_protocol_client_iface_init(PurpleProtocolClientInterface *client_iface)
 {
   client_iface->get_actions     = null_get_actions;
   client_iface->status_text     = null_status_text;
@@ -1045,7 +1045,7 @@ null_protocol_client_iface_init(PurpleProtocolClientIface *client_iface)
 }
 
 static void
-null_protocol_server_iface_init(PurpleProtocolServerIface *server_iface)
+null_protocol_server_iface_init(PurpleProtocolServerInterface *server_iface)
 {
   server_iface->register_user  = null_register_user;
   server_iface->set_info       = null_set_info;
@@ -1065,14 +1065,14 @@ null_protocol_server_iface_init(PurpleProtocolServerIface *server_iface)
 }
 
 static void
-null_protocol_im_iface_init(PurpleProtocolIMIface *im_iface)
+null_protocol_im_iface_init(PurpleProtocolIMInterface *im_iface)
 {
   im_iface->send        = null_send_im;
   im_iface->send_typing = null_send_typing;
 }
 
 static void
-null_protocol_chat_iface_init(PurpleProtocolChatIface *chat_iface)
+null_protocol_chat_iface_init(PurpleProtocolChatInterface *chat_iface)
 {
   chat_iface->info          = null_chat_info;
   chat_iface->info_defaults = null_chat_info_defaults;
@@ -1086,7 +1086,7 @@ null_protocol_chat_iface_init(PurpleProtocolChatIface *chat_iface)
 }
 
 static void
-null_protocol_privacy_iface_init(PurpleProtocolPrivacyIface *privacy_iface)
+null_protocol_privacy_iface_init(PurpleProtocolPrivacyInterface *privacy_iface)
 {
   privacy_iface->add_permit      = null_add_permit;
   privacy_iface->add_deny        = null_add_deny;
@@ -1096,7 +1096,7 @@ null_protocol_privacy_iface_init(PurpleProtocolPrivacyIface *privacy_iface)
 }
 
 static void
-null_protocol_roomlist_iface_init(PurpleProtocolRoomlistIface *roomlist_iface)
+null_protocol_roomlist_iface_init(PurpleProtocolRoomlistInterface *roomlist_iface)
 {
   roomlist_iface->get_list        = null_roomlist_get_list;
   roomlist_iface->cancel          = null_roomlist_cancel;
@@ -1112,22 +1112,22 @@ null_protocol_roomlist_iface_init(PurpleProtocolRoomlistIface *roomlist_iface)
 PURPLE_DEFINE_TYPE_EXTENDED(
   NullProtocol, null_protocol, PURPLE_TYPE_PROTOCOL, 0,
 
-  PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_CLIENT_IFACE,
+  PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_CLIENT,
                                     null_protocol_client_iface_init)
 
-  PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_SERVER_IFACE,
+  PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_SERVER,
                                     null_protocol_server_iface_init)
 
-  PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_IM_IFACE,
+  PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_IM,
                                     null_protocol_im_iface_init)
 
-  PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_CHAT_IFACE,
+  PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_CHAT,
                                     null_protocol_chat_iface_init)
 
-  PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_PRIVACY_IFACE,
+  PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_PRIVACY,
                                     null_protocol_privacy_iface_init)
 
-  PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_ROOMLIST_IFACE,
+  PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_ROOMLIST,
                                     null_protocol_roomlist_iface_init)
 );
 

@@ -60,7 +60,7 @@ icq_protocol_class_init(PurpleProtocolClass *klass)
 }
 
 static void
-icq_protocol_client_iface_init(PurpleProtocolClientIface *client_iface)
+icq_protocol_client_iface_init(PurpleProtocolClientInterface *client_iface)
 {
 	client_iface->get_account_text_table = icq_get_account_text_table;
 	client_iface->get_moods              = oscar_get_purple_moods;
@@ -70,6 +70,6 @@ icq_protocol_client_iface_init(PurpleProtocolClientIface *client_iface)
 PURPLE_DEFINE_TYPE_EXTENDED(
 	ICQProtocol, icq_protocol, OSCAR_TYPE_PROTOCOL, 0,
 
-	PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_CLIENT_IFACE,
+	PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_CLIENT,
 	                                  icq_protocol_client_iface_init)
 );

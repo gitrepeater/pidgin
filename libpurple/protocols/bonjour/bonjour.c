@@ -671,7 +671,7 @@ bonjour_protocol_class_init(PurpleProtocolClass *klass)
 }
 
 static void
-bonjour_protocol_client_iface_init(PurpleProtocolClientIface *client_iface)
+bonjour_protocol_client_iface_init(PurpleProtocolClientInterface *client_iface)
 {
 	client_iface->status_text          = bonjour_status_text;
 	client_iface->tooltip_text         = bonjour_tooltip_text;
@@ -680,7 +680,7 @@ bonjour_protocol_client_iface_init(PurpleProtocolClientIface *client_iface)
 }
 
 static void
-bonjour_protocol_server_iface_init(PurpleProtocolServerIface *server_iface)
+bonjour_protocol_server_iface_init(PurpleProtocolServerInterface *server_iface)
 {
 	server_iface->add_buddy      = bonjour_fake_add_buddy;
 	server_iface->remove_buddy   = bonjour_remove_buddy;
@@ -691,7 +691,7 @@ bonjour_protocol_server_iface_init(PurpleProtocolServerIface *server_iface)
 }
 
 static void
-bonjour_protocol_im_iface_init(PurpleProtocolIMIface *im_iface)
+bonjour_protocol_im_iface_init(PurpleProtocolIMInterface *im_iface)
 {
 	im_iface->send = bonjour_send_im;
 }
@@ -707,13 +707,13 @@ bonjour_protocol_xfer_iface_init(PurpleProtocolXferInterface *xfer_iface)
 PURPLE_DEFINE_TYPE_EXTENDED(
 	BonjourProtocol, bonjour_protocol, PURPLE_TYPE_PROTOCOL, 0,
 
-	PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_CLIENT_IFACE,
+	PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_CLIENT,
 	                                  bonjour_protocol_client_iface_init)
 
-	PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_SERVER_IFACE,
+	PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_SERVER,
 	                                  bonjour_protocol_server_iface_init)
 
-	PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_IM_IFACE,
+	PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_IM,
 	                                  bonjour_protocol_im_iface_init)
 
 	PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_XFER,

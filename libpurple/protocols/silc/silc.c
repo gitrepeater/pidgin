@@ -2204,7 +2204,7 @@ silcpurple_protocol_class_init(PurpleProtocolClass *klass)
 }
 
 static void
-silcpurple_protocol_client_iface_init(PurpleProtocolClientIface *client_iface)
+silcpurple_protocol_client_iface_init(PurpleProtocolClientInterface *client_iface)
 {
 	client_iface->get_actions     = silcpurple_get_actions;
 	client_iface->status_text     = silcpurple_status_text;
@@ -2213,7 +2213,7 @@ silcpurple_protocol_client_iface_init(PurpleProtocolClientIface *client_iface)
 }
 
 static void
-silcpurple_protocol_server_iface_init(PurpleProtocolServerIface *server_iface)
+silcpurple_protocol_server_iface_init(PurpleProtocolServerInterface *server_iface)
 {
 	server_iface->set_info       = silcpurple_set_info;
 	server_iface->get_info       = silcpurple_get_info;
@@ -2227,13 +2227,13 @@ silcpurple_protocol_server_iface_init(PurpleProtocolServerIface *server_iface)
 }
 
 static void
-silcpurple_protocol_im_iface_init(PurpleProtocolIMIface *im_iface)
+silcpurple_protocol_im_iface_init(PurpleProtocolIMInterface *im_iface)
 {
 	im_iface->send = silcpurple_send_im;
 }
 
 static void
-silcpurple_protocol_chat_iface_init(PurpleProtocolChatIface *chat_iface)
+silcpurple_protocol_chat_iface_init(PurpleProtocolChatInterface *chat_iface)
 {
 	chat_iface->info          = silcpurple_chat_info;
 	chat_iface->info_defaults = silcpurple_chat_info_defaults;
@@ -2246,7 +2246,7 @@ silcpurple_protocol_chat_iface_init(PurpleProtocolChatIface *chat_iface)
 }
 
 static void
-silcpurple_protocol_roomlist_iface_init(PurpleProtocolRoomlistIface *roomlist_iface)
+silcpurple_protocol_roomlist_iface_init(PurpleProtocolRoomlistInterface *roomlist_iface)
 {
 	roomlist_iface->get_list = silcpurple_roomlist_get_list;
 	roomlist_iface->cancel   = silcpurple_roomlist_cancel;
@@ -2262,22 +2262,22 @@ silcpurple_protocol_xfer_iface_init(PurpleProtocolXferInterface *xfer_iface)
 PURPLE_DEFINE_TYPE_EXTENDED(
 	SilcProtocol, silcpurple_protocol, PURPLE_TYPE_PROTOCOL, 0,
 
-	PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_CLIENT_IFACE,
+	PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_CLIENT,
 	                                  silcpurple_protocol_client_iface_init)
 
-	PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_SERVER_IFACE,
+	PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_SERVER,
 	                                  silcpurple_protocol_server_iface_init)
 
-	PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_IM_IFACE,
+	PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_IM,
 	                                  silcpurple_protocol_im_iface_init)
 
-	PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_CHAT_IFACE,
+	PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_CHAT,
 	                                  silcpurple_protocol_chat_iface_init)
 
-	PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_ROOMLIST_IFACE,
+	PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_ROOMLIST,
 	                                  silcpurple_protocol_roomlist_iface_init)
 
-	PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_XFER_IFACE,
+	PURPLE_IMPLEMENT_INTERFACE_STATIC(PURPLE_TYPE_PROTOCOL_XFER,
 	                                  silcpurple_protocol_xfer_iface_init)
 );
 
