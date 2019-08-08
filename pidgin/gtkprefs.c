@@ -103,8 +103,8 @@ struct _PidginPrefCombo {
 struct _PidginPrefsWindow {
 	GtkDialog parent;
 
-	/* Notebook */
-	GtkWidget *notebook;
+	/* Stack */
+	GtkWidget *stack;
 
 	/* Interface page */
 	struct {
@@ -264,6 +264,7 @@ struct _PidginPrefsWindow {
 			GtkWidget *level;
 			GtkWidget *threshold;
 			GtkWidget *volume;
+			GtkWidget *test;
 			GstElement *pipeline;
 		} voice;
 
@@ -271,6 +272,7 @@ struct _PidginPrefsWindow {
 			PidginPrefCombo input;
 			PidginPrefCombo output;
 			GtkWidget *drawing_area;
+			GtkWidget *test;
 			GstElement *pipeline;
 		} video;
 	} vv;
@@ -2911,10 +2913,18 @@ create_test_element(PurpleMediaElementType type)
 }
 
 static void
-vv_test_switch_page_cb(GtkNotebook *notebook, GtkWidget *page, guint num, gpointer data)
+vv_test_switch_page_cb(GtkStack *stack, G_GNUC_UNUSED GParamSpec *pspec,
+                       gpointer data)
 {
-	GtkWidget *test = data;
-	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(test), FALSE);
+	PidginPrefsWindow *win = data;
+
+	if (!g_str_equal(gtk_stack_get_visible_child_name(stack), "vv")) {
+		/* Disable any running test pipelines. */
+		gtk_toggle_button_set_active(
+		        GTK_TOGGLE_BUTTON(win->vv.voice.test), FALSE);
+		gtk_toggle_button_set_active(
+		        GTK_TOGGLE_BUTTON(win->vv.video.test), FALSE);
+	}
 }
 
 static GstElement *
@@ -3052,8 +3062,6 @@ toggle_voice_test_cb(GtkToggleButton *test, gpointer data)
 		                 G_CALLBACK(on_volume_change_cb), win);
 		g_signal_connect(test, "destroy",
 		                 G_CALLBACK(voice_test_destroy_cb), win);
-		g_signal_connect(win->notebook, "switch-page",
-		                 G_CALLBACK(vv_test_switch_page_cb), test);
 	} else {
 		gtk_progress_bar_set_fraction(
 		        GTK_PROGRESS_BAR(win->vv.voice.level), 0.0);
@@ -3063,9 +3071,6 @@ toggle_voice_test_cb(GtkToggleButton *test, gpointer data)
 		                    G_CALLBACK(on_volume_change_cb), win, NULL);
 		g_object_disconnect(test, "any-signal::destroy",
 		                    G_CALLBACK(voice_test_destroy_cb), win,
-		                    NULL);
-		g_object_disconnect(win->notebook, "any-signal::switch-page",
-		                    G_CALLBACK(vv_test_switch_page_cb), test,
 		                    NULL);
 		voice_test_destroy_cb(NULL, win);
 	}
@@ -3123,9 +3128,10 @@ bind_voice_test(PidginPrefsWindow *win, GtkBuilder *builder)
 	win->vv.voice.level =
 	        GTK_WIDGET(gtk_builder_get_object(builder, "vv.voice.level"));
 
-	test = gtk_builder_get_object(builder, "vv.voice.test_button");
+	test = gtk_builder_get_object(builder, "vv.voice.test");
 	g_signal_connect(test, "toggled",
 	                 G_CALLBACK(toggle_voice_test_cb), win);
+	win->vv.voice.test = GTK_WIDGET(test);
 }
 
 static GstElement *
@@ -3230,14 +3236,9 @@ toggle_video_test_cb(GtkToggleButton *test, gpointer data)
 		enable_video_test(win);
 		g_signal_connect(test, "destroy",
 		                 G_CALLBACK(video_test_destroy_cb), win);
-		g_signal_connect(win->notebook, "switch-page",
-		                 G_CALLBACK(vv_test_switch_page_cb), test);
 	} else {
 		g_object_disconnect(test, "any-signal::destroy",
 		                    G_CALLBACK(video_test_destroy_cb), win,
-		                    NULL);
-		g_object_disconnect(win->notebook, "any-signal::switch-page",
-		                    G_CALLBACK(vv_test_switch_page_cb), test,
 		                    NULL);
 		video_test_destroy_cb(NULL, win);
 	}
@@ -3267,9 +3268,10 @@ bind_video_test(PidginPrefsWindow *win, GtkBuilder *builder)
 	gtk_widget_set_visual(video, gdk_screen_get_system_visual(
 	                                     gtk_widget_get_screen(video)));
 
-	test = gtk_builder_get_object(builder, "vv.video.test_button");
+	test = gtk_builder_get_object(builder, "vv.video.test");
 	g_signal_connect(test, "toggled",
 	                 G_CALLBACK(toggle_video_test_cb), win);
+	win->vv.video.test = GTK_WIDGET(test);
 }
 
 static void
@@ -3426,6 +3428,9 @@ vv_page(PidginPrefsWindow *win)
 
 	bind_video_test(win, builder);
 
+	g_signal_connect(win->stack, "notify::visible-child",
+	                 G_CALLBACK(vv_test_switch_page_cb), win);
+
 	g_object_ref(ret);
 	g_object_unref(builder);
 
@@ -3434,10 +3439,10 @@ vv_page(PidginPrefsWindow *win)
 #endif
 
 static void
-prefs_notebook_init(PidginPrefsWindow *win)
+prefs_stack_init(PidginPrefsWindow *win)
 {
 #ifdef USE_VV
-	GtkNotebook *notebook = GTK_NOTEBOOK(win->notebook);
+	GtkStack *stack = GTK_STACK(win->stack);
 	GtkWidget *vv;
 #endif
 
@@ -3453,7 +3458,9 @@ prefs_notebook_init(PidginPrefsWindow *win)
 	bind_theme_page(win);
 #ifdef USE_VV
 	vv = vv_page(win);
-	gtk_notebook_append_page(notebook, vv, gtk_label_new(_("Voice/Video")));
+	gtk_container_add_with_properties(GTK_CONTAINER(stack), vv, "name",
+	                                  "vv", "title", _("Voice/Video"),
+	                                  NULL);
 	g_object_unref(vv);
 #endif
 }
@@ -3469,8 +3476,8 @@ pidgin_prefs_window_class_init(PidginPrefsWindowClass *klass)
 	);
 
 	/* Main window */
-	gtk_widget_class_bind_template_child(
-			widget_class, PidginPrefsWindow, notebook);
+	gtk_widget_class_bind_template_child(widget_class, PidginPrefsWindow,
+	                                     stack);
 	gtk_widget_class_bind_template_callback(widget_class, delete_prefs);
 
 	/* Interface page */
@@ -3757,7 +3764,7 @@ pidgin_prefs_window_init(PidginPrefsWindow *win)
 	/* Create the window */
 	gtk_widget_init_template(GTK_WIDGET(win));
 
-	prefs_notebook_init(win);
+	prefs_stack_init(win);
 
 	/* Refresh the list of themes before showing the preferences window */
 	prefs_themes_refresh();
