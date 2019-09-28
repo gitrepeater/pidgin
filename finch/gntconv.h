@@ -45,11 +45,31 @@ typedef struct _FinchConv FinchConv;
 typedef struct _FinchConvChat FinchConvChat;
 typedef struct _FinchConvIm FinchConvIm;
 
+/**
+ * FinchConversationFlag:
+ * @FINCH_CONV_NO_SOUND: A flag to mute a conversation.
+ *
+ * Flags that can be set for each conversation.
+ */
 typedef enum
 {
 	FINCH_CONV_NO_SOUND     = 1 << 0,
 } FinchConversationFlag;
 
+/**
+ * FinchConv:
+ * @list: A list of conversations being displayed in this window.
+ * @active_conv: The active conversation.
+ * @window: The #GntWindow for the conversation.
+ * @entry: The #GntEntry for input.
+ * @tv: The #GntTextView that displays the history.
+ * @menu: The menu for the conversation.
+ * @info: The info widget that shows the information about the conversation.
+ * @plugins: The #GntMenuItem for plugins.
+ * @flags: The flags for the conversation.
+ *
+ * A Finch conversation.
+ */
 struct _FinchConv
 {
 	GList *list;
@@ -70,21 +90,38 @@ struct _FinchConv
 	} u;
 };
 
+/**
+ * FinchConvChat:
+ * @userlist: The widget that displays the users in the chat.
+ *
+ * The chat specific implementation for a conversation.
+ */
 struct _FinchConvChat
 {
 	GntWidget *userlist;       /* the userlist */
 
+	/*< private >*/
 	void *finch_reserved1;
 	void *finch_reserved2;
 	void *finch_reserved3;
 	void *finch_reserved4;
 };
 
+/**
+ * FinchConvIm:
+ * @sendto: The sendto widget which allows the user to select who they're
+ *          messaging.
+ * @e2ee_menu: The end-to-end-encryption widget which lets the user configure
+ *             the encryption.
+ *
+ * The instant message implementation for a conversation.
+ */
 struct _FinchConvIm
 {
 	GntMenuItem *sendto;
 	GntMenuItem *e2ee_menu;
 
+	/*< private >*/
 	void *finch_reserved1;
 	void *finch_reserved2;
 	void *finch_reserved3;
