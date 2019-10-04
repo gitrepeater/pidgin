@@ -1,4 +1,6 @@
 if PLUGINS
+	subdir('kwallet')
+
 	if enable_nettle
 		internalkeyring_plugin = library('internalkeyring', 'internalkeyring.c',
 		    dependencies : [nettle, libpurple_dep],
@@ -16,15 +18,6 @@ if PLUGINS
 	if IS_WIN32
 		wincred_plugin = library('wincred', 'wincred.c',
 		    dependencies : [libpurple_dep],
-		    name_prefix : '',
-		    install : true, install_dir : PURPLE_PLUGINDIR)
-	endif
-
-	if enable_kwallet
-		kwallet_moc = moc.process('kwallet.cpp')
-
-		kwallet_plugin = library('kwallet', 'kwallet.cpp', kwallet_moc,
-		    dependencies : [kwallet, qt4, libpurple_dep],
 		    name_prefix : '',
 		    install : true, install_dir : PURPLE_PLUGINDIR)
 	endif
