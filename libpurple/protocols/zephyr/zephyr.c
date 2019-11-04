@@ -55,10 +55,7 @@ static PurpleProtocol *my_protocol = NULL;
 static GSList *cmds = NULL;
 
 extern Code_t ZGetLocations(ZLocations_t *, int *);
-extern Code_t ZSetLocation(char *);
-extern Code_t ZUnsetLocation(void);
 extern Code_t ZGetSubscriptions(ZSubscription_t *, int*);
-extern char __Zephyr_realm[];
 typedef struct _zframe zframe;
 typedef struct _zephyr_triple zephyr_triple;
 typedef struct _zephyr_account zephyr_account;
@@ -1333,25 +1330,9 @@ static gint check_loc(gpointer data)
 		/* XXX add real error reporting */
 		/* doesn't matter if this fails or not; we'll just move on to the next one */
 		if (use_zeph02(zephyr)) {
-#ifdef WIN32
-			int numlocs;
-			int one=1;
-			ZLocateUser(chk,&numlocs,ZAUTH);
-			if (numlocs) {
-				int i;
-				for(i=0;i<numlocs;i++) {
-					ZGetLocations(&locations,&one);
-					if (nlocs>0)
-						purple_protocol_got_user_status(account,name,"available",NULL);
-					else
-						purple_protocol_got_user_status(account,name,"offline",NULL);
-				}
-			}
-#else
 			ZRequestLocations(chk, &ald, UNACKED, ZAUTH);
 			g_free(ald.user);
 			g_free(ald.version);
-#endif /* WIN32 */
 		} else
 			if (use_tzc(zephyr)) {
 				gchar *zlocstr = g_strdup_printf("((tzcfodder . zlocate) \"%s\")\n",chk);
@@ -1419,8 +1400,6 @@ static void zephyr_inithosts(zephyr_account *zephyr)
 	}
 
 	g_strlcpy(zephyr->ourhostcanon, hent->h_name, sizeof(zephyr->ourhostcanon));
-
-	return;
 }
 
 static void process_zsubs(zephyr_account *zephyr)
@@ -2601,7 +2580,6 @@ static void zephyr_chat_set_topic(PurpleConnection * gc, int id, const char *top
 	topic_utf8 = zephyr_recv_convert(gc,(gchar *)topic);
 	purple_chat_conversation_set_topic(gcc,sender,topic_utf8);
 	g_free(topic_utf8);
-	return;
 }
 
 /*  commands */

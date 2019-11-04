@@ -33,7 +33,7 @@ static void
 bonjour_xfer_init(PurpleXfer *xfer);
 static void
 bonjour_xfer_receive(PurpleConnection *pc, const char *id, const char *sid, const char *from,
-		     const goffset filesize, const char *filename, int option);
+		     goffset filesize, const char *filename, int option);
 
 /* Look for specific xfer handle */
 static unsigned int next_id = 0;
@@ -727,7 +727,7 @@ xep_bytestreams_parse(PurpleConnection *pc, PurpleXmlNode *packet, PurpleBuddy *
 
 static void
 bonjour_xfer_receive(PurpleConnection *pc, const char *id, const char *sid, const char *from,
-		     const goffset filesize, const char *filename, int option)
+		     goffset filesize, const char *filename, int option)
 {
 	PurpleXfer *xfer;
 	XepXfer *xf;
@@ -877,7 +877,6 @@ bonjour_sock5_request_cb(gpointer data, gint source, PurpleInputCondition cond)
 	default:
 		break;
 	}
-	return;
 }
 
 static void
@@ -943,8 +942,6 @@ bonjour_bytestreams_init(PurpleXfer *xfer)
 						      bonjour_bytestreams_listen, xfer);
 	if (xf->listen_data == NULL)
 		purple_xfer_cancel_local(xfer);
-
-	return;
 }
 
 static void
