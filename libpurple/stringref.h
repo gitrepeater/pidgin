@@ -43,7 +43,7 @@ G_BEGIN_DECLS
  * Creates an immutable reference-counted string object.  The newly
  * created object will have a reference count of 1.
  *
- * Returns: A newly allocated string reference object with a refcount
+ * Returns: (transfer full): A newly allocated string reference object with a refcount
  *         of 1.
  */
 PurpleStringref *purple_stringref_new(const char *value);
@@ -58,7 +58,7 @@ PurpleStringref *purple_stringref_new(const char *value);
  * not referenced before the next iteration of the mainloop it will
  * be freed at that time.
  *
- * Returns: A newly allocated string reference object with a refcount
+ * Returns: (transfer full): A newly allocated string reference object with a refcount
  *         of zero.
  */
 PurpleStringref *purple_stringref_new_noref(const char *value);
@@ -83,7 +83,7 @@ PurpleStringref *purple_stringref_printf(const char *format, ...);
  *
  * Increase the reference count of the given stringref.
  *
- * Returns: A pointer to the referenced string.
+ * Returns: (transfer full): A pointer to the referenced string.
  */
 PurpleStringref *purple_stringref_ref(PurpleStringref *stringref);
 
