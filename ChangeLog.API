@@ -326,7 +326,8 @@ version 3.0.0 (??/??/????):
 		* _XMLNodeType
 		* account-authorization-requested-with-message signal
 		* network-configuration-changed signal
-		* PurpleAccoun->ui_data
+		* PurpleAccount->ui_data
+		* PurpleAccountPrefsUiOps
 		* purple_account_add_buddies_with_invite
 		* purple_account_add_buddy_with_invite
 		* purple_account_set_current_error
@@ -342,10 +343,13 @@ version 3.0.0 (??/??/????):
 		* purple_buddy_icons_find_custom_icon
 		* purple_buddy_icons_set_custom_icon
 		* purple_build_dir. Use g_mkdir_with_parents instead
-		* purple_certificate_check_signature_chain_with_failing. Use
-		  purple_certificate_check_signature_chain, instead
-		* purple_certificate_display_x509. Use purple_request_certificate,
-		  instead
+		* PurpleCertificateScheme
+		* PURPLE_CERTIFICATE_SCHEME_HAS_FUNC
+		* purple_certificate_check_signature_chain
+		* purple_certificate_check_signature_chain_with_failing
+		* purple_certificate_compare_pubkeys
+		* purple_certificate_display_x509
+		* purple_certificate_get_fingerprint_sha256
 		* Purple Cipher API (PurpleCipherContext and friends).
 		  Use GLib's GHmac or GChecksum instead.
 		* purple_connection_error_reason
@@ -433,9 +437,11 @@ version 3.0.0 (??/??/????):
 		* PurplePluginProtocolInfo
 		* purple_proxy_connect_socks5
 		* purple_quotedp_decode. See the GMime library if needed.
+		* purple_request_certificate
 		* purple_request_field_list_add
 		* purple_srv_cancel
 		* purple_srv_resolve_account
+		* purple_srv_txt_query_destroy
 		* purple_ssl_connect_fd
 		* purple_status_set_attr_boolean
 		* purple_status_set_attr_int
@@ -586,84 +592,11 @@ version 3.0.0 (??/??/????):
 		* _GntTreeColumnFlag
 		* _GntWidgetFlags
 
-version 2.13.0:
-	libpurple:
-		Added:
-		* purple_uri_escape_for_open
-
-version 2.12.0:
-	libpurple:
-		Added:
-		* PURPLE_MESSAGE_REMOTE_SEND in PurpleMessageFlags, to specify
-		messages like _SEND that were sent from another location.
-		* purple_certificate_get_fingerprint_sha256
-		* purple_certificate_compare_pubkeys
-		* PurpleCertificateScheme.get_fingerprint_sha256
-		* PurpleCertificateScheme.compare_pubkeys
-		* PURPLE_CERTIFICATE_SCHEME_HAS_FUNC
-
 version 2.11.0:
 	libpurple:
 		Added:
 		* account-status-changing signal (account signals)
 		* buddy-removed-from-group signal (blist signals)
-		* PurpleCommandsUiOps, to allow the UI to override the
-		  built-in handling of commands.
-		* PurplePrefsUiOps, to allow the UI to override the way global
-		  preferences are stored.
-		* PurpleAccountPrefsUiOps, to allow the UI to handle storage
-		  of account preferences.
-		* purple_media_set_encryption_parameters
-		* purple_media_set_decryption_parameters
-		* purple_xfer_write_file
-		* purple_xfer_read_file
-		* purple_media_set_send_rtcp_mux
-		* purple_media_backend_set_send_rtcp_mux
-
-version 2.10.12:
-	* No changes
-
-version 2.10.11:
-	* No changes
-
-version 2.10.10:
-	* No changes
-
-version 2.10.9:
-	* No changes
-
-version 2.10.8:
-	* No changes
-
-version 2.10.7:
-	* No changes
-
-version 2.10.6:
-	* No changes
-
-version 2.10.5:
-	* No changes
-
-version 2.10.4:
-	* No changes
-
-version 2.10.3:
-	* No changes
-
-version 2.10.2:
-	* No changes
-
-version 2.10.1:
-	* No changes
-
-version 2.10.0:
-	libpurple:
-		Added:
-		* purple_srv_txt_query_destroy (accidentally left out of 2.8.0)
-
-	Pidgin:
-		Added:
-		* pidgin_dialogs_plugins_info (should not be used by anything but Pidgin)
 
 version 2.9.0:
 	libpurple:
